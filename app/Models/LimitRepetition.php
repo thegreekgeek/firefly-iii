@@ -1,22 +1,31 @@
 <?php
 /**
  * LimitRepetition.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
  * Class LimitRepetition
@@ -41,26 +50,6 @@ class LimitRepetition extends Model
         ];
     protected $dates  = ['created_at', 'updated_at', 'startdate', 'enddate'];
     protected $hidden = ['amount_encrypted'];
-
-    /**
-     * @param $value
-     *
-     * @return mixed
-     */
-    public static function routeBinder($value)
-    {
-        if (auth()->check()) {
-            $object = self::where('limit_repetitions.id', $value)
-                          ->leftJoin('budget_limits', 'budget_limits.id', '=', 'limit_repetitions.budget_limit_id')
-                          ->leftJoin('budgets', 'budgets.id', '=', 'budget_limits.budget_id')
-                          ->where('budgets.user_id', auth()->user()->id)
-                          ->first(['limit_repetitions.*']);
-            if ($object) {
-                return $object;
-            }
-        }
-        throw new NotFoundHttpException;
-    }
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo

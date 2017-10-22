@@ -1,15 +1,25 @@
 <?php
 /**
  * ImportJob.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -42,11 +52,11 @@ class ImportJob extends Model
 
     protected $validStatus
         = [
-            'import_status_never_started', // initial state
-            'import_configuration_saved', // import configuration saved. This step is going to be obsolete.
-            'settings_complete', // aka: ready for import.
-            'import_running', // import currently underway
-            'import_complete', // done with everything
+            'new',
+            'initialized',
+            'configured',
+            'running',
+            'finished',
         ];
 
     /**
@@ -67,12 +77,27 @@ class ImportJob extends Model
     }
 
     /**
+     * @param int    $index
+     * @param string $message
+     *
+     * @return bool
+     */
+    public function addError(int $index, string $message): bool
+    {
+        $extended                     = $this->extended_status;
+        $extended['errors'][$index][] = $message;
+        $this->extended_status        = $extended;
+
+        return true;
+    }
+
+    /**
      * @param int $count
      */
     public function addStepsDone(int $count)
     {
-        $status = $this->extended_status;
-        $status['steps_done'] += $count;
+        $status                = $this->extended_status;
+        $status['done']        += $count;
         $this->extended_status = $status;
         $this->save();
 
@@ -83,8 +108,8 @@ class ImportJob extends Model
      */
     public function addTotalSteps(int $count)
     {
-        $status = $this->extended_status;
-        $status['total_steps'] += $count;
+        $status                = $this->extended_status;
+        $status['steps']       += $count;
         $this->extended_status = $status;
         $this->save();
 
@@ -109,7 +134,7 @@ class ImportJob extends Model
         if (is_null($value)) {
             return [];
         }
-        if (strlen($value) == 0) {
+        if (strlen($value) === 0) {
             return [];
         }
 
@@ -123,7 +148,7 @@ class ImportJob extends Model
      */
     public function getExtendedStatusAttribute($value)
     {
-        if (strlen($value) == 0) {
+        if (strlen($value) === 0) {
             return [];
         }
 
@@ -165,7 +190,7 @@ class ImportJob extends Model
         $disk             = Storage::disk('upload');
         $encryptedContent = $disk->get($fileName);
         $content          = Crypt::decrypt($encryptedContent);
-        Log::debug(sprintf('Content size is %d bytes.', $content));
+        Log::debug(sprintf('Content size is %d bytes.', strlen($content)));
 
         return $content;
     }

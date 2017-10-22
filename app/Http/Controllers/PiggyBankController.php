@@ -1,18 +1,28 @@
 <?php
 /**
  * PiggyBankController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Http\Controllers;
 
-use Amount;
 use Carbon\Carbon;
 use ExpandedForm;
 use FireflyIII\Http\Requests\PiggyBankFormRequest;
@@ -27,7 +37,6 @@ use Preferences;
 use Response;
 use Session;
 use Steam;
-use URL;
 use View;
 
 /**
@@ -89,7 +98,7 @@ class PiggyBankController extends Controller
         /** @var Carbon $date */
         $date          = session('end', Carbon::now()->endOfMonth());
         $leftOnAccount = $piggyBank->leftOnAccount($date);
-        $savedSoFar    = $piggyBank->currentRelevantRep()->currentamount?? '0';
+        $savedSoFar    = $piggyBank->currentRelevantRep()->currentamount ?? '0';
         $leftToSave    = bcsub($piggyBank->targetamount, $savedSoFar);
         $maxAmount     = min($leftOnAccount, $leftToSave);
 
@@ -116,7 +125,7 @@ class PiggyBankController extends Controller
 
         // put previous url in session if not redirect from store (not "create another").
         if (session('piggy-banks.create.fromStore') !== true) {
-            Session::put('piggy-banks.create.url', URL::previous());
+            $this->rememberPreviousUri('piggy-banks.create.uri');
         }
         Session::forget('piggy-banks.create.fromStore');
         Session::flash('gaEventCategory', 'piggy-banks');
@@ -135,7 +144,7 @@ class PiggyBankController extends Controller
         $subTitle = trans('firefly.delete_piggy_bank', ['name' => $piggyBank->name]);
 
         // put previous url in session
-        Session::put('piggy-banks.delete.url', URL::previous());
+        $this->rememberPreviousUri('piggy-banks.delete.uri');
         Session::flash('gaEventCategory', 'piggy-banks');
         Session::flash('gaEventAction', 'delete');
 
@@ -150,18 +159,11 @@ class PiggyBankController extends Controller
      */
     public function destroy(PiggyBankRepositoryInterface $repository, PiggyBank $piggyBank)
     {
-        Session::flash('success', strval(trans('firefly.deleted_piggy_bank', ['name' => e($piggyBank->name)])));
+        Session::flash('success', strval(trans('firefly.deleted_piggy_bank', ['name' => $piggyBank->name])));
         Preferences::mark();
-        $piggyBankId = $piggyBank->id;
         $repository->destroy($piggyBank);
 
-        $uri = session('piggy-banks.delete.url');
-        if (!(strpos($uri, sprintf('piggy-banks/show/%s', $piggyBankId)) === false)) {
-            // uri would point back to piggy bank
-            $uri = route('piggy-banks.index');
-        }
-
-        return redirect($uri);
+        return redirect($this->getPreviousUri('piggy-banks.delete.uri'));
     }
 
     /**
@@ -197,7 +199,7 @@ class PiggyBankController extends Controller
 
         // put previous url in session if not redirect from store (not "return_to_edit").
         if (session('piggy-banks.edit.fromUpdate') !== true) {
-            Session::put('piggy-banks.edit.url', URL::previous());
+            $this->rememberPreviousUri('piggy-banks.edit.uri');
         }
         Session::forget('piggy-banks.edit.fromUpdate');
 
@@ -217,10 +219,11 @@ class PiggyBankController extends Controller
         $end = session('end', Carbon::now()->endOfMonth());
 
         $accounts = [];
+        Log::debug('Looping piggues');
         /** @var PiggyBank $piggyBank */
         foreach ($piggyBanks as $piggyBank) {
-            $piggyBank->savedSoFar = $piggyBank->currentRelevantRep()->currentamount;
-            $piggyBank->percentage = $piggyBank->savedSoFar != 0 ? intval($piggyBank->savedSoFar / $piggyBank->targetamount * 100) : 0;
+            $piggyBank->savedSoFar = $piggyBank->currentRelevantRep()->currentamount ?? '0';
+            $piggyBank->percentage = bccomp('0', $piggyBank->savedSoFar) !== 0 ? intval($piggyBank->savedSoFar / $piggyBank->targetamount * 100) : 0;
             $piggyBank->leftToSave = bcsub($piggyBank->targetamount, strval($piggyBank->savedSoFar));
             $piggyBank->percentage = $piggyBank->percentage > 100 ? 100 : $piggyBank->percentage;
 
@@ -228,7 +231,9 @@ class PiggyBankController extends Controller
              * Fill account information:
              */
             $account = $piggyBank->account;
+            $new     = false;
             if (!isset($accounts[$account->id])) {
+                $new                    = true;
                 $accounts[$account->id] = [
                     'name'              => $account->name,
                     'balance'           => Steam::balanceIgnoreVirtual($account, $end),
@@ -237,7 +242,8 @@ class PiggyBankController extends Controller
                     'sumOfTargets'      => $piggyBank->targetamount,
                     'leftToSave'        => $piggyBank->leftToSave,
                 ];
-            } else {
+            }
+            if (isset($accounts[$account->id]) && $new === false) {
                 $accounts[$account->id]['sumOfSaved']   = bcadd($accounts[$account->id]['sumOfSaved'], strval($piggyBank->savedSoFar));
                 $accounts[$account->id]['sumOfTargets'] = bcadd($accounts[$account->id]['sumOfTargets'], $piggyBank->targetamount);
                 $accounts[$account->id]['leftToSave']   = bcadd($accounts[$account->id]['leftToSave'], $piggyBank->leftToSave);
@@ -279,34 +285,32 @@ class PiggyBankController extends Controller
      */
     public function postAdd(Request $request, PiggyBankRepositoryInterface $repository, PiggyBank $piggyBank)
     {
-        $amount = $request->get('amount');
-        Log::debug(sprintf('Found amount is %s', $amount));
-        /** @var Carbon $date */
-        $date          = session('end', Carbon::now()->endOfMonth());
-        $leftOnAccount = $piggyBank->leftOnAccount($date);
-        $savedSoFar    = strval($piggyBank->currentRelevantRep()->currentamount);
-        $leftToSave    = bcsub($piggyBank->targetamount, $savedSoFar);
-        $maxAmount     = strval(min(round($leftOnAccount, 12), round($leftToSave, 12)));
-
-        if (bccomp($amount, $maxAmount) <= 0) {
-            $repetition                = $piggyBank->currentRelevantRep();
-            $currentAmount             = $repetition->currentamount ?? '0';
-            $repetition->currentamount = bcadd($currentAmount, $amount);
-            $repetition->save();
-
-            // create event
-            $repository->createEvent($piggyBank, $amount);
-
+        $amount   = $request->get('amount');
+        $currency = app('amount')->getDefaultCurrency();
+        if ($repository->canAddAmount($piggyBank, $amount)) {
+            $repository->addAmount($piggyBank, $amount);
             Session::flash(
-                'success', strval(trans('firefly.added_amount_to_piggy', ['amount' => Amount::format($amount, false), 'name' => e($piggyBank->name)]))
+                'success', strval(
+                             trans(
+                                 'firefly.added_amount_to_piggy',
+                                 ['amount' => app('amount')->formatAnything($currency, $amount, false), 'name' => $piggyBank->name]
+                             )
+                         )
             );
             Preferences::mark();
 
             return redirect(route('piggy-banks.index'));
         }
 
-        Log::error('Cannot add ' . $amount . ' because max amount is ' . $maxAmount . ' (left on account is ' . $leftOnAccount . ')');
-        Session::flash('error', strval(trans('firefly.cannot_add_amount_piggy', ['amount' => Amount::format($amount, false), 'name' => e($piggyBank->name)])));
+        Log::error('Cannot add ' . $amount . ' because canAddAmount returned false.');
+        Session::flash(
+            'error', strval(
+                       trans(
+                           'firefly.cannot_add_amount_piggy',
+                           ['amount' => app('amount')->formatAnything($currency, $amount, false), 'name' => $piggyBank->name]
+                       )
+                   )
+        );
 
         return redirect(route('piggy-banks.index'));
     }
@@ -320,27 +324,33 @@ class PiggyBankController extends Controller
      */
     public function postRemove(Request $request, PiggyBankRepositoryInterface $repository, PiggyBank $piggyBank)
     {
-        $amount = strval(round($request->get('amount'), 12));
-
-        $savedSoFar = $piggyBank->currentRelevantRep()->currentamount;
-
-        if (bccomp($amount, $savedSoFar) <= 0) {
-            $repetition                = $piggyBank->currentRelevantRep();
-            $repetition->currentamount = bcsub($repetition->currentamount, $amount);
-            $repetition->save();
-
-            // create event
-            $repository->createEvent($piggyBank, bcmul($amount, '-1'));
-
+        $amount   = $request->get('amount');
+        $currency = app('amount')->getDefaultCurrency();
+        if ($repository->canRemoveAmount($piggyBank, $amount)) {
+            $repository->removeAmount($piggyBank, $amount);
             Session::flash(
-                'success', strval(trans('firefly.removed_amount_from_piggy', ['amount' => Amount::format($amount, false), 'name' => e($piggyBank->name)]))
+                'success',
+                strval(
+                    trans(
+                        'firefly.removed_amount_from_piggy', ['amount' => app('amount')->formatAnything($currency, $amount, false), 'name' => $piggyBank->name]
+                    )
+                )
             );
             Preferences::mark();
 
             return redirect(route('piggy-banks.index'));
         }
 
-        Session::flash('error', strval(trans('firefly.cannot_remove_from_piggy', ['amount' => Amount::format($amount, false), 'name' => e($piggyBank->name)])));
+        $amount = strval(round($request->get('amount'), 12));
+
+        Session::flash(
+            'error', strval(
+                       trans(
+                           'firefly.cannot_remove_from_piggy',
+                           ['amount' => app('amount')->formatAnything($currency, $amount, false), 'name' => $piggyBank->name]
+                       )
+                   )
+        );
 
         return redirect(route('piggy-banks.index'));
     }
@@ -395,18 +405,18 @@ class PiggyBankController extends Controller
         $data      = $request->getPiggyBankData();
         $piggyBank = $repository->store($data);
 
-        Session::flash('success', strval(trans('firefly.stored_piggy_bank', ['name' => e($piggyBank->name)])));
+        Session::flash('success', strval(trans('firefly.stored_piggy_bank', ['name' => $piggyBank->name])));
         Preferences::mark();
 
         if (intval($request->get('create_another')) === 1) {
+            // @codeCoverageIgnoreStart
             Session::put('piggy-banks.create.fromStore', true);
 
             return redirect(route('piggy-banks.create'))->withInput();
+            // @codeCoverageIgnoreEnd
         }
 
-
-        // redirect to previous URL.
-        return redirect(session('piggy-banks.create.url'));
+        return redirect($this->getPreviousUri('piggy-banks.create.uri'));
     }
 
     /**
@@ -421,21 +431,17 @@ class PiggyBankController extends Controller
         $data      = $request->getPiggyBankData();
         $piggyBank = $repository->update($piggyBank, $data);
 
-        Session::flash('success', strval(trans('firefly.updated_piggy_bank', ['name' => e($piggyBank->name)])));
+        Session::flash('success', strval(trans('firefly.updated_piggy_bank', ['name' => $piggyBank->name])));
         Preferences::mark();
 
         if (intval($request->get('return_to_edit')) === 1) {
+            // @codeCoverageIgnoreStart
             Session::put('piggy-banks.edit.fromUpdate', true);
 
             return redirect(route('piggy-banks.edit', [$piggyBank->id]));
+            // @codeCoverageIgnoreEnd
         }
 
-
-        // redirect to previous URL.
-        return redirect(session('piggy-banks.edit.url'));
-
-
+        return redirect($this->getPreviousUri('piggy-banks.edit.uri'));
     }
-
-
 }

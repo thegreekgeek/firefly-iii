@@ -1,20 +1,33 @@
 <?php
 /**
  * ExportJobServiceProvider.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 namespace FireflyIII\Providers;
 
-use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Repositories\ExportJob\ExportJobRepository;
+use FireflyIII\Repositories\ExportJob\ExportJobRepositoryInterface;
+use FireflyIII\Repositories\ImportJob\ImportJobRepository;
+use FireflyIII\Repositories\ImportJob\ImportJobRepositoryInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -33,8 +46,7 @@ class ExportJobServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        $this->exportJob();
-        $this->importJob();
+
 
     }
 
@@ -45,7 +57,8 @@ class ExportJobServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->exportJob();
+        $this->importJob();
     }
 
     /**
@@ -53,18 +66,16 @@ class ExportJobServiceProvider extends ServiceProvider
      */
     private function exportJob()
     {
-
         $this->app->bind(
-            'FireflyIII\Repositories\ExportJob\ExportJobRepositoryInterface',
-            function (Application $app, array $arguments) {
-                if (!isset($arguments[0]) && $app->auth->check()) {
-                    return app('FireflyIII\Repositories\ExportJob\ExportJobRepository', [auth()->user()]);
-                }
-                if (!isset($arguments[0]) && !$app->auth->check()) {
-                    throw new FireflyException('There is no user present.');
+            ExportJobRepositoryInterface::class,
+            function (Application $app) {
+                /** @var ExportJobRepository $repository */
+                $repository = app(ExportJobRepository::class);
+                if ($app->auth->check()) {
+                    $repository->setUser(auth()->user());
                 }
 
-                return app('FireflyIII\Repositories\ExportJob\ExportJobRepository', $arguments);
+                return $repository;
             }
         );
     }
@@ -72,16 +83,15 @@ class ExportJobServiceProvider extends ServiceProvider
     private function importJob()
     {
         $this->app->bind(
-            'FireflyIII\Repositories\ImportJob\ImportJobRepositoryInterface',
-            function (Application $app, array $arguments) {
-                if (!isset($arguments[0]) && $app->auth->check()) {
-                    return app('FireflyIII\Repositories\ImportJob\ImportJobRepository', [auth()->user()]);
-                }
-                if (!isset($arguments[0]) && !$app->auth->check()) {
-                    throw new FireflyException('There is no user present.');
+            ImportJobRepositoryInterface::class,
+            function (Application $app) {
+                /** @var ImportJobRepository $repository */
+                $repository = app(ImportJobRepository::class);
+                if ($app->auth->check()) {
+                    $repository->setUser(auth()->user());
                 }
 
-                return app('FireflyIII\Repositories\ImportJob\ImportJobRepository', $arguments);
+                return $repository;
             }
         );
     }

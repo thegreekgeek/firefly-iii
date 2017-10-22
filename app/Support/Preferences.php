@@ -1,21 +1,32 @@
 <?php
 /**
  * Preferences.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support;
 
 use Cache;
 use FireflyIII\Models\Preference;
 use FireflyIII\User;
+use Illuminate\Support\Collection;
 use Session;
 
 /**
@@ -26,12 +37,25 @@ use Session;
 class Preferences
 {
     /**
+     * @param User   $user
+     * @param string $search
+     *
+     * @return Collection
+     */
+    public function beginsWith(User $user, string $search): Collection
+    {
+        $set = Preference::where('user_id', $user->id)->where('name', 'LIKE', $search . '%')->get();
+
+        return $set;
+    }
+
+    /**
      * @param $name
      *
      * @return bool
      * @throws \Exception
      */
-    public function delete($name): bool
+    public function delete(string $name): bool
     {
         $fullName = sprintf('preference%s%s', auth()->user()->id, $name);
         if (Cache::has($fullName)) {
@@ -40,6 +64,18 @@ class Preferences
         Preference::where('user_id', auth()->user()->id)->where('name', $name)->delete();
 
         return true;
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return Collection
+     */
+    public function findByName(string $name): Collection
+    {
+        $set = Preference::where('name', $name)->get();
+
+        return $set;
     }
 
     /**
@@ -118,9 +154,13 @@ class Preferences
      */
     public function lastActivity(): string
     {
-        $preference = $this->get('lastActivity', microtime())->data;
+        $lastActivity = microtime();
+        $preference   = $this->get('lastActivity', microtime());
+        if (!is_null($preference)) {
+            $lastActivity = $preference->data;
+        }
 
-        return md5($preference);
+        return md5($lastActivity);
     }
 
     /**

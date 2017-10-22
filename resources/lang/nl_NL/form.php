@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * form.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -28,12 +30,10 @@ return [
     'currency_id'                    => 'Valuta',
     'attachments'                    => 'Bijlagen',
     'journal_amount'                 => 'Bedrag',
-    'journal_asset_source_account'   => 'Betaalrekening (bron)',
     'journal_source_account_name'    => 'Debiteur (bron)',
     'journal_source_account_id'      => 'Betaalrekening (bron)',
     'BIC'                            => 'BIC',
-    'account_from_id'                => 'Van account',
-    'account_to_id'                  => 'Naar account',
+    'verify_password'                => 'Bevestig wachtwoordsterkte',
     'source_account'                 => 'Bronrekening',
     'destination_account'            => 'Doelrekening',
     'journal_destination_account_id' => 'Betaalrekening (doel)',
@@ -48,9 +48,8 @@ return [
     'budget_id'                      => 'Budget',
     'openingBalance'                 => 'Startsaldo',
     'tagMode'                        => 'Tag modus',
-    'tagPosition'                    => 'Tag locatie',
+    'tag_position'                    => 'Taglocatie',
     'virtualBalance'                 => 'Virtuele saldo',
-    'longitude_latitude'             => 'Locatie',
     'targetamount'                   => 'Doelbedrag',
     'accountRole'                    => 'Rol van rekening',
     'openingBalanceDate'             => 'Startsaldodatum',
@@ -64,8 +63,14 @@ return [
     'expense_account'                => 'Crediteur',
     'revenue_account'                => 'Debiteur',
     'decimal_places'                 => 'Aantal decimalen',
+    'exchange_rate_instruction'      => 'Vreemde valuta',
+    'source_amount'                  => 'Bronbedrag',
+    'destination_amount'             => 'Doelbedrag',
+    'native_amount'                  => 'Origineel bedrag',
+    'new_email_address'              => 'Nieuw emailadres',
+    'verification'                   => 'Verificatie',
+    'api_key'                        => 'API sleutel',
 
-    'revenue_account_source'      => 'Debiteur (bron)',
     'source_account_asset'        => 'Bronrekening (betaalrekening)',
     'destination_account_expense' => 'Doelrekening (crediteur)',
     'destination_account_asset'   => 'Doelrekening (betaalrekening)',
@@ -92,6 +97,7 @@ return [
     'code'                       => 'Code',
     'iban'                       => 'IBAN',
     'accountNumber'              => 'Rekeningnummer',
+    'creditCardNumber'           => 'Creditcardnummer',
     'has_headers'                => 'Kolomnamen op de eerste rij?',
     'date_format'                => 'Datumformaat',
     'specifix'                   => 'Bank- or of bestandsspecifieke opties',
@@ -102,7 +108,6 @@ return [
     'add_new_withdrawal'         => 'Maak nieuwe uitgave',
     'add_new_deposit'            => 'Maak nieuwe inkomsten',
     'add_new_transfer'           => 'Maak nieuwe overschrijving',
-    'noPiggybank'                => '(geen spaarpotje)',
     'title'                      => 'Titel',
     'notes'                      => 'Notities',
     'filename'                   => 'Bestandsnaam',
@@ -127,6 +132,9 @@ return [
     'delete_attachment'          => 'Verwijder bijlage ":name"',
     'delete_rule'                => 'Verwijder regel ":title"',
     'delete_rule_group'          => 'Verwijder regelgroep ":title"',
+    'delete_link_type'           => 'Verwijder linktype ":name"',
+    'delete_user'                => 'Verwijder gebruiker ":email"',
+    'user_areYouSure'            => 'Als je gebruiker ":email" verwijdert is alles weg. Je kan dit niet ongedaan maken of ont-verwijderen of wat dan ook. Als je jezelf verwijdert ben je ook je toegang tot deze installatie van Firefly III kwijt.',
     'attachment_areYouSure'      => 'Weet je zeker dat je de bijlage met naam ":name" wilt verwijderen?',
     'account_areYouSure'         => 'Weet je zeker dat je de rekening met naam ":name" wilt verwijderen?',
     'bill_areYouSure'            => 'Weet je zeker dat je het contract met naam ":name" wilt verwijderen?',
@@ -139,11 +147,14 @@ return [
     'journal_areYouSure'         => 'Weet je zeker dat je de transactie met naam ":description" wilt verwijderen?',
     'mass_journal_are_you_sure'  => 'Weet je zeker dat je al deze transacties wilt verwijderen?',
     'tag_areYouSure'             => 'Weet je zeker dat je de tag met naam ":tag" wilt verwijderen?',
+    'journal_link_areYouSure'    => 'Weet je zeker dat je de koppeling tussen <a href=":source_link">:source</a> en <a href=":destination_link">:destination</a> wilt verwijderen?',
+    'linkType_areYouSure'        => 'Weet je zeker dat je linktype ":name" (":inward" / ":outward") wilt verwijderen?',
     'permDeleteWarning'          => 'Dingen verwijderen uit Firefly is permanent en kan niet ongedaan gemaakt worden.',
     'mass_make_selection'        => 'Je kan items alsnog redden van de ondergang door het vinkje weg te halen.',
     'delete_all_permanently'     => 'Verwijder geselecteerde items permanent',
     'update_all_journals'        => 'Wijzig deze transacties',
     'also_delete_transactions'   => 'Ook de enige transactie verbonden aan deze rekening wordt verwijderd.|Ook alle :count transacties verbonden aan deze rekening worden verwijderd.',
+    'also_delete_connections'    => 'De enige transactie gelinkt met dit linktype zal deze verbinding verliezen. | Alle :count transacties met dit linktype zullen deze verbinding verliezen.',
     'also_delete_rules'          => 'De enige regel in deze regelgroep wordt ook verwijderd.|Alle :count regels in deze regelgroep worden ook verwijderd.',
     'also_delete_piggyBanks'     => 'Ook het spaarpotje verbonden aan deze rekening wordt verwijderd.|Ook alle :count spaarpotjes verbonden aan deze rekening worden verwijderd.',
     'bill_keep_transactions'     => 'De transactie verbonden aan dit contract blijft bewaard.|De :count transacties verbonden aan dit contract blijven bewaard.',
@@ -161,7 +172,6 @@ return [
     // admin
     'domain'                => 'Domein',
     'single_user_mode'      => 'Enkele gebruiker-modus',
-    'must_confirm_account'  => 'Nieuwe gebruikers moeten hun account activeren',
     'is_demo_site'          => 'Is demo website',
 
 
@@ -174,11 +184,12 @@ return [
     'csv_tab'               => 'Een tab (onzichtbaar)',
     'csv_delimiter'         => 'CSV scheidingsteken',
     'csv_import_account'    => 'Standaard rekening voor importeren',
-    'csv_config'            => 'Configuratiebestand',
-
 
     'due_date'           => 'Vervaldatum',
     'payment_date'       => 'Betalingsdatum',
     'invoice_date'       => 'Factuurdatum',
     'internal_reference' => 'Interne verwijzing',
+    'inward'             => 'Binnenwaartse beschrijving',
+    'outward'            => 'Buitenwaartse beschrijving',
+    'rule_group_id'      => 'Regelgroep',
 ];

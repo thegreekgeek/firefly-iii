@@ -1,15 +1,25 @@
 <?php
 /**
  * Bill.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -17,6 +27,7 @@ use Crypt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Watson\Validating\ValidatingTrait;
 
@@ -28,7 +39,7 @@ use Watson\Validating\ValidatingTrait;
 class Bill extends Model
 {
 
-    use ValidatingTrait;
+    use SoftDeletes, ValidatingTrait;
     /**
      * The attributes that should be casted to native types.
      *
@@ -62,7 +73,7 @@ class Bill extends Model
     public static function routeBinder(Bill $value)
     {
         if (auth()->check()) {
-            if ($value->user_id == auth()->user()->id) {
+            if (intval($value->user_id) === auth()->user()->id) {
                 return $value;
             }
         }
@@ -77,7 +88,7 @@ class Bill extends Model
     public function getMatchAttribute($value)
     {
 
-        if (intval($this->match_encrypted) == 1) {
+        if (intval($this->match_encrypted) === 1) {
             return Crypt::decrypt($value);
         }
 
@@ -92,7 +103,7 @@ class Bill extends Model
     public function getNameAttribute($value)
     {
 
-        if (intval($this->name_encrypted) == 1) {
+        if (intval($this->name_encrypted) === 1) {
             return Crypt::decrypt($value);
         }
 

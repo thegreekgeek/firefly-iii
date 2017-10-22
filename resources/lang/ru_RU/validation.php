@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -10,17 +12,16 @@
  */
 
 return [
-    'iban'                           => 'This is not a valid IBAN.',
-    'unique_account_number_for_user' => 'It looks like this account number is already in use.',
-    'deleted_user'                   => 'Due to security constraints, you cannot register using this email address.',
-    'rule_trigger_value'             => 'This value is invalid for the selected trigger.',
-    'rule_action_value'              => 'This value is invalid for the selected action.',
-    'invalid_domain'                 => 'Due to security constraints, you cannot register from this domain.',
-    'file_already_attached'          => 'Uploaded file ":name" is already attached to this object.',
-    'file_attached'                  => 'Succesfully uploaded file ":name".',
-    'file_invalid_mime'              => 'File ":name" is of type ":mime" which is not accepted as a new upload.',
-    'file_too_large'                 => 'File ":name" is too large.',
-    'belongs_to_user'                => 'The value of :attribute is unknown',
+    'iban'                           => 'Это некорректный IBAN.',
+    'unique_account_number_for_user' => 'Этот номер счёта уже используется.',
+    'deleted_user'                   => 'По соображениям безопасности, вы не можете зарегистрироваться, используя этот адрес электронной почты.',
+    'rule_trigger_value'             => 'Это значение является недопустимым для выбранного триггера.',
+    'rule_action_value'              => 'Это значение является недопустимым для выбранного действия.',
+    'file_already_attached'          => 'Загруженный файл ":name" уже прикреплён к этому объекту.',
+    'file_attached'                  => 'Файл ":name". успешно загружен.',
+    'file_invalid_mime'              => 'Файл ":name" имеет тип ":mime". Загрузка файлов такого типа невозможна.',
+    'file_too_large'                 => 'Файл ":name" слишком большой.',
+    'belongs_to_user'                => 'Значение :attribute неизвестно',
     'accepted'                       => 'The :attribute must be accepted.',
     'bic'                            => 'This is not a valid BIC.',
     'more'                           => ':attribute must be larger than zero.',
@@ -88,4 +89,5 @@ return [
     'in_array'                       => 'The :attribute field does not exist in :other.',
     'present'                        => 'The :attribute field must be present.',
     'amount_zero'                    => 'The total amount cannot be zero',
+    'secure_password'                => 'This is not a secure password. Please try again. For more information, visit https://goo.gl/NCh2tN',
 ];

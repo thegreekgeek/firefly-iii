@@ -1,15 +1,25 @@
 <?php
 /**
  * UserRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\User;
 
@@ -53,6 +63,38 @@ class UserRepository implements UserRepositoryInterface
     }
 
     /**
+     * This updates the users email address and records some things so it can be confirmed or undone later.
+     * The user is blocked until the change is confirmed.
+     *
+     * @param User   $user
+     * @param string $newEmail
+     *
+     * @see updateEmail
+     *
+     * @return bool
+     */
+    public function changeEmail(User $user, string $newEmail): bool
+    {
+        $oldEmail = $user->email;
+
+        // save old email as pref
+        Preferences::setForUser($user, 'previous_email_latest', $oldEmail);
+        Preferences::setForUser($user, 'previous_email_' . date('Y-m-d-H-i-s'), $oldEmail);
+
+        // set undo and confirm token:
+        Preferences::setForUser($user, 'email_change_undo_token', strval(bin2hex(random_bytes(16))));
+        Preferences::setForUser($user, 'email_change_confirm_token', strval(bin2hex(random_bytes(16))));
+        // update user
+
+        $user->email        = $newEmail;
+        $user->blocked      = 1;
+        $user->blocked_code = 'email_changed';
+        $user->save();
+
+        return true;
+    }
+
+    /**
      * @param User   $user
      * @param string $password
      *
@@ -61,6 +103,23 @@ class UserRepository implements UserRepositoryInterface
     public function changePassword(User $user, string $password): bool
     {
         $user->password = bcrypt($password);
+        $user->save();
+
+        return true;
+    }
+
+    /**
+     * @param User   $user
+     * @param bool   $isBlocked
+     * @param string $code
+     *
+     * @return bool
+     */
+    public function changeStatus(User $user, bool $isBlocked, string $code): bool
+    {
+        // change blocked status and code:
+        $user->blocked      = $isBlocked;
+        $user->blocked_code = $code;
         $user->save();
 
         return true;
@@ -100,6 +159,16 @@ class UserRepository implements UserRepositoryInterface
         }
 
         return new User;
+    }
+
+    /**
+     * @param string $email
+     *
+     * @return User|null
+     */
+    public function findByEmail(string $email): ?User
+    {
+        return User::where('email', $email)->first();
     }
 
     /**
@@ -146,5 +215,41 @@ class UserRepository implements UserRepositoryInterface
         $return['tags']                = $user->tags()->count();
 
         return $return;
+    }
+
+    /**
+     * @param User   $user
+     * @param string $role
+     *
+     * @return bool
+     */
+    public function hasRole(User $user, string $role): bool
+    {
+        return $user->hasRole($role);
+    }
+
+    /**
+     * This updates the users email address. Same as changeEmail just without most logging. This makes sure that the undo/confirm routine can't catch this one.
+     * The user is NOT blocked.
+     *
+     * @param User   $user
+     * @param string $newEmail
+     *
+     * @see changeEmail
+     *
+     * @return bool
+     */
+    public function updateEmail(User $user, string $newEmail): bool
+    {
+        $oldEmail = $user->email;
+
+        // save old email as pref
+        Preferences::setForUser($user, 'admin_previous_email_latest', $oldEmail);
+        Preferences::setForUser($user, 'admin_previous_email_' . date('Y-m-d-H-i-s'), $oldEmail);
+
+        $user->email = $newEmail;
+        $user->save();
+
+        return true;
     }
 }

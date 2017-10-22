@@ -1,30 +1,54 @@
 <?php
 /**
  * ForgotPasswordController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
+ * This file is part of Firefly III.
+ *
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+declare(strict_types=1);
+
+
+/**
+ * ForgotPasswordController.php
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  * This software may be modified and distributed under the terms of the
  * Creative Commons Attribution-ShareAlike 4.0 International License.
  *
  * See the LICENSE file for details.
  */
-declare(strict_types = 1);
 
 namespace FireflyIII\Http\Controllers\Auth;
 
 use FireflyIII\Http\Controllers\Controller;
-use FireflyIII\User;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
-use Illuminate\Http\Request;
-use Password;
 
-/**
- * Class ForgotPasswordController
- *
- * @package FireflyIII\Http\Controllers\Auth
- */
 class ForgotPasswordController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | Password Reset Controller
+    |--------------------------------------------------------------------------
+    |
+    | This controller is responsible for handling password reset emails and
+    | includes a trait which assists in sending these notifications from
+    | your application to your users. Feel free to explore this trait.
+    |
+    */
+
     use SendsPasswordResetEmails;
 
     /**
@@ -35,40 +59,6 @@ class ForgotPasswordController extends Controller
     {
         parent::__construct();
         $this->middleware('guest');
-    }
 
-    /**
-     * Send a reset link to the given user.
-     *
-     * @param  Request $request
-     *
-     * @return \Illuminate\Http\RedirectResponse
-     */
-    public function sendResetLinkEmail(Request $request)
-    {
-        $this->validate($request, ['email' => 'required|email']);
-
-        // verify if the user is not a demo user. If so, we give him back an error.
-        $user = User::where('email', $request->get('email'))->first();
-        if (!is_null($user) && $user->hasRole('demo')) {
-            return back()->withErrors(
-                ['email' => trans('firefly.cannot_reset_demo_user')]
-            );
-        }
-
-        $response = $this->broker()->sendResetLink(
-            $request->only('email')
-        );
-
-        if ($response === Password::RESET_LINK_SENT) {
-            return back()->with('status', trans($response));
-        }
-
-        // If an error was returned by the password broker, we will get this message
-        // translated so we can notify a user of the problem. We'll redirect back
-        // to where the users came from so they can attempt this process again.
-        return back()->withErrors(
-            ['email' => trans($response)]
-        );
     }
 }

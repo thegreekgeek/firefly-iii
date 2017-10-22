@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -15,7 +17,6 @@ return [
     'deleted_user'                   => 'Je kan je niet registreren met dit e-mailadres.',
     'rule_trigger_value'             => 'Deze waarde is niet geldig voor de geselecteerde trigger.',
     'rule_action_value'              => 'Deze waarde is niet geldig voor de geselecteerde actie.',
-    'invalid_domain'                 => 'Kan niet registereren vanaf dit domein.',
     'file_already_attached'          => 'Het geuploade bestand ":name" is al gelinkt aan deze transactie.',
     'file_attached'                  => 'Bestand met naam ":name" is met succes geuploaded.',
     'file_invalid_mime'              => 'Bestand ":name" is van het type ":mime", en die kan je niet uploaden.',
@@ -88,4 +89,5 @@ return [
     'in_array'                       => 'Het :attribute veld bestaat niet in :other.',
     'present'                        => 'Het :attribute veld moet aanwezig zijn.',
     'amount_zero'                    => 'Het totaalbedrag kan niet nul zijn',
+    'secure_password'                => 'Dit is geen sterk wachtwoord. Probeer het nog een keer. Zie ook: https://goo.gl/NCh2tN',
 ];

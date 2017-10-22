@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * config.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -10,7 +12,7 @@
  */
 
 return [
-    'locale'          => 'de, Deutsch, de_DE.utf8',
+    'locale'          => 'de, Deutsch, de_DE, de_DE.utf8, de_DE.UTF-8',
     'month'           => '%B %Y',
     'month_and_day'   => '%e. %B %Y',
     'date_time'       => '%e %B %Y, @ %T',

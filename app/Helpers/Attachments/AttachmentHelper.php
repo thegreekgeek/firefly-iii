@@ -1,21 +1,34 @@
 <?php
 /**
  * AttachmentHelper.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Helpers\Attachments;
 
 use Crypt;
 use FireflyIII\Models\Attachment;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\MessageBag;
+use Log;
 use Storage;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -27,6 +40,8 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 class AttachmentHelper implements AttachmentHelperInterface
 {
 
+    /** @var  Collection */
+    public $attachments;
     /** @var MessageBag */
     public $errors;
     /** @var MessageBag */
@@ -45,9 +60,10 @@ class AttachmentHelper implements AttachmentHelperInterface
     public function __construct()
     {
         $this->maxUploadSize = intval(config('firefly.maxUploadSize'));
-        $this->allowedMimes  = (array) config('firefly.allowedMimes');
+        $this->allowedMimes  = (array)config('firefly.allowedMimes');
         $this->errors        = new MessageBag;
         $this->messages      = new MessageBag;
+        $this->attachments   = new Collection;
         $this->uploadDisk    = Storage::disk('upload');
     }
 
@@ -61,6 +77,14 @@ class AttachmentHelper implements AttachmentHelperInterface
         $path = sprintf('%s%sat-%d.data', storage_path('upload'), DIRECTORY_SEPARATOR, intval($attachment->id));
 
         return $path;
+    }
+
+    /**
+     * @return Collection
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
     }
 
     /**
@@ -85,7 +109,7 @@ class AttachmentHelper implements AttachmentHelperInterface
      *
      * @return bool
      */
-    public function saveAttachmentsForModel(Model $model, array $files = null): bool
+    public function saveAttachmentsForModel(Model $model, ?array $files): bool
     {
         if (is_array($files)) {
             foreach ($files as $entry) {
@@ -109,7 +133,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         $md5   = md5_file($file->getRealPath());
         $name  = $file->getClientOriginalName();
         $class = get_class($model);
-        $count = auth()->user()->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
+        $count = $model->user->attachments()->where('md5', $md5)->where('attachable_id', $model->id)->where('attachable_type', $class)->count();
 
         if ($count > 0) {
             $msg = (string)trans('validation.file_already_attached', ['name' => $name]);
@@ -136,7 +160,7 @@ class AttachmentHelper implements AttachmentHelperInterface
         }
 
         $attachment = new Attachment; // create Attachment object.
-        $attachment->user()->associate(auth()->user());
+        $attachment->user()->associate($model->user);
         $attachment->attachable()->associate($model);
         $attachment->md5      = md5_file($file->getRealPath());
         $attachment->filename = $file->getClientOriginalName();
@@ -144,17 +168,20 @@ class AttachmentHelper implements AttachmentHelperInterface
         $attachment->size     = $file->getSize();
         $attachment->uploaded = 0;
         $attachment->save();
+        Log::debug('Created attachment:', $attachment->toArray());
 
         $fileObject = $file->openFile('r');
         $fileObject->rewind();
         $content   = $fileObject->fread($file->getSize());
         $encrypted = Crypt::encrypt($content);
+        Log::debug(sprintf('Full file length is %d and upload size is %d.', strlen($content), $file->getSize()));
+        Log::debug(sprintf('Encrypted content is %d', strlen($encrypted)));
 
         // store it:
         $this->uploadDisk->put($attachment->fileName(), $encrypted);
-
         $attachment->uploaded = 1; // update attachment
         $attachment->save();
+        $this->attachments->push($attachment);
 
         $name = e($file->getClientOriginalName()); // add message:
         $msg  = (string)trans('validation.file_attached', ['name' => $name]);
@@ -162,8 +189,6 @@ class AttachmentHelper implements AttachmentHelperInterface
 
         // return it.
         return $attachment;
-
-
     }
 
     /**
@@ -187,6 +212,8 @@ class AttachmentHelper implements AttachmentHelperInterface
     }
 
     /**
+     * @codeCoverageIgnore
+     *
      * @param UploadedFile $file
      *
      * @return bool
@@ -217,7 +244,7 @@ class AttachmentHelper implements AttachmentHelperInterface
             return false;
         }
         if (!$this->validSize($file)) {
-            return false;
+            return false; // @codeCoverageIgnore
         }
         if ($this->hasFile($file, $model)) {
             return false;

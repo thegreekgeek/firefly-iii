@@ -1,15 +1,25 @@
 <?php
 /**
  * FireflyValidator.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Validation;
 
@@ -23,13 +33,13 @@ use FireflyIII\Models\Budget;
 use FireflyIII\Models\PiggyBank;
 use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
-use FireflyIII\Rules\Triggers\TriggerInterface;
+use FireflyIII\Services\Password\Verifier;
+use FireflyIII\TransactionRules\Triggers\TriggerInterface;
 use FireflyIII\User;
 use Google2FA;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Validation\Validator;
-use Session;
-use Symfony\Component\Translation\TranslatorInterface;
 
 /**
  * Class FireflyValidator
@@ -40,14 +50,14 @@ class FireflyValidator extends Validator
 {
 
     /**
-     * @param TranslatorInterface $translator
-     * @param array               $data
-     * @param array               $rules
-     * @param array               $messages
-     * @param array               $customAttributes
+     * @param Translator $translator
+     * @param array      $data
+     * @param array      $rules
+     * @param array      $messages
+     * @param array      $customAttributes
      *
      */
-    public function __construct(TranslatorInterface $translator, array $data, array $rules, array $messages = [], array $customAttributes = [])
+    public function __construct(Translator $translator, array $data, array $rules, array $messages = [], array $customAttributes = [])
     {
         parent::__construct($translator, $data, $rules, $messages, $customAttributes);
     }
@@ -66,7 +76,7 @@ class FireflyValidator extends Validator
             return false;
         }
 
-        $secret = Session::get('two-factor-secret');
+        $secret = session('two-factor-secret');
 
         return Google2FA::verifyKey($secret, $value);
     }
@@ -158,6 +168,7 @@ class FireflyValidator extends Validator
     public function validateMore($attribute, $value, $parameters): bool
     {
         $compare = $parameters[0] ?? '0';
+
         return bccomp($value, $compare) > 0;
     }
 
@@ -211,7 +222,7 @@ class FireflyValidator extends Validator
                     // count budgets, should have at least one
                     $count = $budgets->filter(
                         function (Budget $budget) use ($value) {
-                            return $budget->name == $value;
+                            return $budget->name === $value;
                         }
                     )->count();
 
@@ -275,6 +286,28 @@ class FireflyValidator extends Validator
     }
 
     /**
+     * @param $attribute
+     * @param $value
+     *
+     * @return bool
+     */
+    public function validateSecurePassword($attribute, $value): bool
+    {
+        $verify = false;
+        if (isset($this->data['verify_password'])) {
+            $verify = intval($this->data['verify_password']) === 1;
+        }
+        if ($verify) {
+            /** @var Verifier $service */
+            $service = app(Verifier::class);
+
+            return $service->validPassword($value);
+        }
+
+        return true;
+    }
+
+    /**
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param $attribute
      * @param $value
@@ -329,7 +362,7 @@ class FireflyValidator extends Validator
 
         /** @var AccountMeta $entry */
         foreach ($set as $entry) {
-            if ($entry->data == $value) {
+            if ($entry->data === $value) {
 
                 return false;
             }
@@ -363,7 +396,7 @@ class FireflyValidator extends Validator
         $exclude = $parameters[2] ?? 0;
 
         // get entries from table
-        $set = DB::table($table)->where('user_id', auth()->user()->id)
+        $set = DB::table($table)->where('user_id', auth()->user()->id)->whereNull('deleted_at')
                  ->where('id', '!=', $exclude)->get([$field]);
 
         foreach ($set as $entry) {
@@ -398,7 +431,7 @@ class FireflyValidator extends Validator
         /** @var PiggyBank $entry */
         foreach ($set as $entry) {
             $fieldValue = $this->tryDecrypt($entry->name);
-            if ($fieldValue == $value) {
+            if ($fieldValue === $value) {
                 return false;
             }
         }
@@ -460,7 +493,7 @@ class FireflyValidator extends Validator
         $set = $user->accounts()->where('account_type_id', $type->id)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
-            if ($entry->name == $value) {
+            if ($entry->name === $value) {
                 return false;
             }
         }
@@ -486,7 +519,7 @@ class FireflyValidator extends Validator
         $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
-            if ($entry->name == $value) {
+            if ($entry->name === $value) {
                 return false;
             }
         }
@@ -510,7 +543,7 @@ class FireflyValidator extends Validator
         $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
-            if ($entry->name == $value) {
+            if ($entry->name === $value) {
                 return false;
             }
         }
@@ -534,7 +567,7 @@ class FireflyValidator extends Validator
         $set = auth()->user()->accounts()->where('account_type_id', $type->id)->where('id', '!=', $ignore)->get();
         /** @var Account $entry */
         foreach ($set as $entry) {
-            if ($entry->name == $value) {
+            if ($entry->name === $value) {
                 return false;
             }
         }

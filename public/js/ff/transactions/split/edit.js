@@ -1,13 +1,25 @@
 /*
  * edit.js
  * Copyright (c) 2017 thegrumpydictator@gmail.com
- * This software may be modified and distributed under the terms of the Creative Commons Attribution-ShareAlike 4.0 International License.
  *
- * See the LICENSE file for details.
+ * This file is part of Firefly III.
+ *
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 
-/** global: originalSum, accounting, what, Modernizr */
+/** global: originalSum, accounting, what, Modernizr, currencySymbol */
 
 var destAccounts = {};
 var srcAccounts = {};
@@ -16,8 +28,8 @@ var descriptions = {};
 
 $(document).ready(function () {
     "use strict";
-    $('.btn-do-split').click(cloneRow);
-    $('.remove-current-split').click(removeRow);
+    $('.btn-do-split').click(cloneDivRow);
+    $('.remove-current-split').click(removeDivRow);
 
     $.getJSON('json/expense-accounts').done(function (data) {
         destAccounts = data;
@@ -67,28 +79,36 @@ $(document).ready(function () {
     }
 });
 
-
-function removeRow(e) {
+/**
+ * New and cool
+ * @param e
+ * @returns {boolean}
+ */
+function removeDivRow(e) {
     "use strict";
-    var rows = $('table.split-table tbody tr');
+    var rows = $('div.split_row');
     if (rows.length === 1) {
         return false;
     }
     var row = $(e.target);
     var index = row.data('split');
-    $('table.split-table tbody tr[data-split="' + index + '"]').remove();
+    $('div.split_row[data-split="' + index + '"]').remove();
 
 
-    resetSplits();
+    resetDivSplits();
 
     return false;
 
 }
 
-function cloneRow() {
+/**
+ * New and cool
+ * @returns {boolean}
+ */
+function cloneDivRow() {
     "use strict";
-    var source = $('.table.split-table tbody tr').last().clone();
-    var count = $('.split-table tbody tr').length + 1;
+    var source = $('div.split_row').last().clone();
+    var count = $('div.split_row').length + 1;
     source.removeClass('initial-row');
     source.find('.count').text('#' + count);
 
@@ -107,26 +127,37 @@ function cloneRow() {
         source.find('input[name$="description]"]').typeahead({source: descriptions});
     }
 
-    $('.split-table tbody').append(source);
+    $('div.split_row_holder').append(source);
 
     // remove original click things, add them again:
-    $('.remove-current-split').unbind('click').click(removeRow);
-
+    $('.remove-current-split').unbind('click').click(removeDivRow);
 
     calculateSum();
-    resetSplits();
+    resetDivSplits();
 
     return false;
 }
 
-function resetSplits() {
+/**
+ * New and hip
+ */
+function resetDivSplits() {
     "use strict";
     // loop rows, reset numbers:
 
     // update the row split number:
-    $.each($('table.split-table tbody tr'), function (i, v) {
+    $.each($('div.split_row'), function (i, v) {
         var row = $(v);
         row.attr('data-split', i);
+
+        // add or remove class with bg thing
+        if (i % 2 === 0) {
+            row.removeClass('bg-gray-light');
+        }
+        if (i % 2 === 1) {
+            row.addClass('bg-gray-light');
+        }
+
     });
 
     // loop each remove button, update the index
@@ -166,11 +197,31 @@ function resetSplits() {
         var input = $(v);
         input.attr('name', 'transactions[' + i + '][amount]');
     });
+
+    // ends with ][foreign_amount]
+    $.each($('input[name$="][foreign_amount]"]'), function (i, v) {
+        var input = $(v);
+        input.attr('name', 'transactions[' + i + '][foreign_amount]');
+    });
+
+    // ends with ][transaction_currency_id]
+    $.each($('input[name$="][transaction_currency_id]"]'), function (i, v) {
+        var input = $(v);
+        input.attr('name', 'transactions[' + i + '][transaction_currency_id]');
+    });
+
+    // ends with ][foreign_currency_id]
+    $.each($('input[name$="][foreign_currency_id]"]'), function (i, v) {
+        var input = $(v);
+        input.attr('name', 'transactions[' + i + '][foreign_currency_id]');
+    });
+
     // ends with ][budget_id]
     $.each($('select[name$="][budget_id]"]'), function (i, v) {
         var input = $(v);
         input.attr('name', 'transactions[' + i + '][budget_id]');
     });
+
     // ends with ][category]
     $.each($('input[name$="][category]"]'), function (i, v) {
         var input = $(v);
@@ -178,20 +229,28 @@ function resetSplits() {
     });
 }
 
+
 function calculateSum() {
     "use strict";
+    var left = originalSum * -1;
     var sum = 0;
     var set = $('input[name$="][amount]"]');
     for (var i = 0; i < set.length; i++) {
         var current = $(set[i]);
-        sum += (current.val() == "" ? 0 : parseFloat(current.val()));
+        sum += (current.val() === "" ? 0 : parseFloat(current.val()));
+        left += (current.val() === "" ? 0 : parseFloat(current.val()));
     }
     sum = Math.round(sum * 100) / 100;
+    left = Math.round(left * 100) / 100;
+
 
     $('.amount-warning').remove();
-    if (sum != originalSum) {
+    if (sum !== originalSum) {
         var holder = $('#journal_amount_holder');
         var par = holder.find('p.form-control-static');
-        $('<span>').text(' (' + accounting.formatMoney(sum) + ')').addClass('text-danger amount-warning').appendTo(par);
+        $('<span>').text(' (' + accounting.formatMoney(sum, currencySymbol) + ')').addClass('text-danger amount-warning').appendTo(par);
+        // also add what's left to divide (or vice versa)
+        $('<span>').text(' (' + accounting.formatMoney(left, currencySymbol) + ')').addClass('text-danger amount-warning').appendTo(par);
     }
+
 }

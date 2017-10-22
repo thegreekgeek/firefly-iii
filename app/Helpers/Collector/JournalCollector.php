@@ -1,37 +1,51 @@
 <?php
 /**
  * JournalCollector.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Helpers\Collector;
 
 
 use Carbon\Carbon;
-use Crypt;
 use DB;
 use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Helpers\Filter\FilterInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
+use FireflyIII\Helpers\Filter\NegativeAmountFilter;
+use FireflyIII\Helpers\Filter\OpposingAccountFilter;
+use FireflyIII\Helpers\Filter\PositiveAmountFilter;
+use FireflyIII\Helpers\Filter\TransferFilter;
 use FireflyIII\Models\AccountType;
 use FireflyIII\Models\Budget;
 use FireflyIII\Models\Category;
 use FireflyIII\Models\Tag;
 use FireflyIII\Models\Transaction;
-use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\User;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Log;
+use Steam;
 
 /**
  * Maybe this is a good idea after all...
@@ -39,6 +53,9 @@ use Log;
  * Class JournalCollector
  *
  * @package FireflyIII\Helpers\Collector
+ *
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class JournalCollector implements JournalCollectorInterface
 {
@@ -54,27 +71,39 @@ class JournalCollector implements JournalCollectorInterface
             'transaction_journals.description',
             'transaction_journals.date',
             'transaction_journals.encrypted',
-            //'transaction_journals.transaction_currency_id',
-            'transaction_currencies.code as transaction_currency_code',
-            //'transaction_currencies.symbol as transaction_currency_symbol',
             'transaction_types.type as transaction_type_type',
             'transaction_journals.bill_id',
             'bills.name as bill_name',
             'bills.name_encrypted as bill_name_encrypted',
+
             'transactions.id as id',
-            'transactions.amount as transaction_amount',
             'transactions.description as transaction_description',
             'transactions.account_id',
             'transactions.identifier',
             'transactions.transaction_journal_id',
+            'transactions.amount as transaction_amount',
+            'transactions.transaction_currency_id as transaction_currency_id',
+
+            'transaction_currencies.code as transaction_currency_code',
+            'transaction_currencies.symbol as transaction_currency_symbol',
+            'transaction_currencies.decimal_places as transaction_currency_dp',
+
+            'transactions.foreign_amount as transaction_foreign_amount',
+            'transactions.foreign_currency_id as foreign_currency_id',
+
+            'foreign_currencies.code as foreign_currency_code',
+            'foreign_currencies.symbol as foreign_currency_symbol',
+            'foreign_currencies.decimal_places as foreign_currency_dp',
+
             'accounts.name as account_name',
             'accounts.encrypted as account_encrypted',
+            'accounts.iban as account_iban',
             'account_types.type as account_type',
+
         ];
-    /** @var  bool */
-    private $filterInternalTransfers;
-    /** @var  bool */
-    private $filterTransfers = false;
+    /** @var array */
+    private $filters = [InternalTransferFilter::class];
+
     /** @var  bool */
     private $joinedBudget = false;
     /** @var  bool */
@@ -97,14 +126,19 @@ class JournalCollector implements JournalCollectorInterface
     private $user;
 
     /**
-     * JournalCollector constructor.
+     * @param string $filter
      *
-     * @param User $user
+     * @return JournalCollectorInterface
      */
-    public function __construct(User $user)
+    public function addFilter(string $filter): JournalCollectorInterface
     {
-        $this->user  = $user;
-        $this->query = $this->startQuery();
+        $interfaces = class_implements($filter);
+        if (in_array(FilterInterface::class, $interfaces) && !in_array($filter, $this->filters) ) {
+            Log::debug(sprintf('Enabled filter %s', $filter));
+            $this->filters[] = $filter;
+        }
+
+        return $this;
     }
 
     /**
@@ -132,67 +166,30 @@ class JournalCollector implements JournalCollectorInterface
     }
 
     /**
-     * @return JournalCollectorInterface
-     */
-    public function disableFilter(): JournalCollectorInterface
-    {
-        $this->filterTransfers = false;
-
-        return $this;
-    }
-
-    /**
-     * @return JournalCollectorInterface
-     */
-    public function disableInternalFilter(): JournalCollectorInterface
-    {
-        $this->filterInternalTransfers = false;
-
-        return $this;
-    }
-
-    /**
-     * @return JournalCollectorInterface
-     */
-    public function enableInternalFilter(): JournalCollectorInterface
-    {
-        $this->filterInternalTransfers = true;
-
-        return $this;
-    }
-
-    /**
      * @return Collection
      */
     public function getJournals(): Collection
     {
         $this->run = true;
         /** @var Collection $set */
-        $set       = $this->query->get(array_values($this->fields));
-        Log::debug(sprintf('Count of set is %d', $set->count()));
-        $set = $this->filterTransfers($set);
-        Log::debug(sprintf('Count of set after filterTransfers() is %d', $set->count()));
+        $set = $this->query->get(array_values($this->fields));
 
-        // possibly filter "internal" transfers:
-        $set = $this->filterInternalTransfers($set);
-        Log::debug(sprintf('Count of set after filterInternalTransfers() is %d', $set->count()));
-
+        // run all filters:
+        $set = $this->filter($set);
 
         // loop for decryption.
         $set->each(
             function (Transaction $transaction) {
                 $transaction->date        = new Carbon($transaction->date);
-                $transaction->description = $transaction->encrypted ? Crypt::decrypt($transaction->description) : $transaction->description;
+                $transaction->description = Steam::decrypt(intval($transaction->encrypted), $transaction->description);
 
                 if (!is_null($transaction->bill_name)) {
-                    $transaction->bill_name = $transaction->bill_name_encrypted ? Crypt::decrypt($transaction->bill_name) : $transaction->bill_name;
+                    $transaction->bill_name = Steam::decrypt(intval($transaction->bill_name_encrypted), $transaction->bill_name);
                 }
+                $transaction->opposing_account_name = app('steam')->tryDecrypt($transaction->opposing_account_name);
+                $transaction->account_iban          = app('steam')->tryDecrypt($transaction->account_iban);
+                $transaction->opposing_account_iban = app('steam')->tryDecrypt($transaction->opposing_account_iban);
 
-                try {
-                    $transaction->opposing_account_name = Crypt::decrypt($transaction->opposing_account_name);
-                } catch (DecryptException $e) {
-                    // if this fails its already decrypted.
-                }
 
             }
         );
@@ -217,6 +214,22 @@ class JournalCollector implements JournalCollectorInterface
     }
 
     /**
+     * @param string $filter
+     *
+     * @return JournalCollectorInterface
+     */
+    public function removeFilter(string $filter): JournalCollectorInterface
+    {
+        $key = array_search($filter, $this->filters, true);
+        if (!($key === false)) {
+            Log::debug(sprintf('Removed filter %s', $filter));
+            unset($this->filters[$key]);
+        }
+
+        return $this;
+    }
+
+    /**
      * @param Collection $accounts
      *
      * @return JournalCollectorInterface
@@ -231,7 +244,7 @@ class JournalCollector implements JournalCollectorInterface
         }
 
         if ($accounts->count() > 1) {
-            $this->filterTransfers = true;
+            $this->addFilter(TransferFilter::class);
         }
 
 
@@ -244,8 +257,9 @@ class JournalCollector implements JournalCollectorInterface
     public function setAllAssetAccounts(): JournalCollectorInterface
     {
         /** @var AccountRepositoryInterface $repository */
-        $repository = app(AccountRepositoryInterface::class, [$this->user]);
-        $accounts   = $repository->getAccountsByType([AccountType::ASSET, AccountType::DEFAULT]);
+        $repository = app(AccountRepositoryInterface::class);
+        $repository->setUser($this->user);
+        $accounts = $repository->getAccountsByType([AccountType::ASSET, AccountType::DEFAULT]);
         if ($accounts->count() > 0) {
             $accountIds = $accounts->pluck('id')->toArray();
             $this->query->whereIn('transactions.account_id', $accountIds);
@@ -253,7 +267,7 @@ class JournalCollector implements JournalCollectorInterface
         }
 
         if ($accounts->count() > 1) {
-            $this->filterTransfers = true;
+            $this->addFilter(TransferFilter::class);
         }
 
         return $this;
@@ -306,6 +320,7 @@ class JournalCollector implements JournalCollectorInterface
             return $this;
         }
         $this->joinBudgetTables();
+        Log::debug('Journal collector will filter for budgets', $budgetIds);
 
         $this->query->where(
             function (EloquentBuilder $q) use ($budgetIds) {
@@ -392,6 +407,10 @@ class JournalCollector implements JournalCollectorInterface
      */
     public function setPage(int $page): JournalCollectorInterface
     {
+        if ($page < 1) {
+            $page = 1;
+        }
+
         $this->page = $page;
 
         if ($page > 0) {
@@ -404,10 +423,10 @@ class JournalCollector implements JournalCollectorInterface
             $this->offset = $offset;
             $this->query->skip($offset);
             Log::debug(sprintf('Changed offset to %d', $offset));
+
+            return $this;
         }
-        if (is_null($this->limit)) {
-            Log::debug('The limit is zero, cannot set the page.');
-        }
+        Log::debug('The limit is zero, cannot set the page.');
 
         return $this;
     }
@@ -421,8 +440,11 @@ class JournalCollector implements JournalCollectorInterface
     public function setRange(Carbon $start, Carbon $end): JournalCollectorInterface
     {
         if ($start <= $end) {
-            $this->query->where('transaction_journals.date', '>=', $start->format('Y-m-d'));
-            $this->query->where('transaction_journals.date', '<=', $end->format('Y-m-d'));
+            $startStr = $start->format('Y-m-d');
+            $endStr   = $end->format('Y-m-d');
+            $this->query->where('transaction_journals.date', '>=', $startStr);
+            $this->query->where('transaction_journals.date', '<=', $endStr);
+            Log::debug(sprintf('JournalCollector range is now %s - %s (inclusive)', $startStr, $endStr));
         }
 
         return $this;
@@ -442,6 +464,20 @@ class JournalCollector implements JournalCollectorInterface
     }
 
     /**
+     * @param Collection $tags
+     *
+     * @return JournalCollectorInterface
+     */
+    public function setTags(Collection $tags): JournalCollectorInterface
+    {
+        $this->joinTagTables();
+        $tagIds = $tags->pluck('id')->toArray();
+        $this->query->whereIn('tag_transaction_journal.tag_id', $tagIds);
+
+        return $this;
+    }
+
+    /**
      * @param array $types
      *
      * @return JournalCollectorInterface
@@ -454,6 +490,43 @@ class JournalCollector implements JournalCollectorInterface
         }
 
         return $this;
+    }
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        Log::debug(sprintf('Journal collector now collecting for user #%d', $user->id));
+        $this->user = $user;
+        $this->startQuery();
+    }
+
+    /**
+     *
+     */
+    public function startQuery()
+    {
+        Log::debug('journalCollector::startQuery');
+        /** @var EloquentBuilder $query */
+        $query = Transaction::leftJoin('transaction_journals', 'transaction_journals.id', '=', 'transactions.transaction_journal_id')
+                            ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
+                            ->leftJoin('bills', 'bills.id', 'transaction_journals.bill_id')
+                            ->leftJoin('accounts', 'accounts.id', '=', 'transactions.account_id')
+                            ->leftJoin('account_types', 'accounts.account_type_id', 'account_types.id')
+                            ->leftJoin('transaction_currencies', 'transaction_currencies.id', 'transactions.transaction_currency_id')
+                            ->leftJoin('transaction_currencies as foreign_currencies', 'foreign_currencies.id', 'transactions.foreign_currency_id')
+                            ->whereNull('transactions.deleted_at')
+                            ->whereNull('transaction_journals.deleted_at')
+                            ->where('transaction_journals.user_id', $this->user->id)
+                            ->orderBy('transaction_journals.date', 'DESC')
+                            ->orderBy('transaction_journals.order', 'ASC')
+                            ->orderBy('transaction_journals.id', 'DESC')
+                            ->orderBy('transaction_journals.description', 'DESC')
+                            ->orderBy('transactions.amount','DESC');
+
+        $this->query = $query;
+
     }
 
     /**
@@ -483,36 +556,6 @@ class JournalCollector implements JournalCollectorInterface
     public function withOpposingAccount(): JournalCollectorInterface
     {
         $this->joinOpposingTables();
-
-        $accountIds = $this->accountIds;
-        $this->query->where(
-            function (EloquentBuilder $q1) use ($accountIds) {
-                // set 1:
-                // where source is in the set of $accounts
-                // but destination is not.
-                $q1->where(
-                    function (EloquentBuilder $q2) use ($accountIds) {
-                        // transactions.account_id in set
-                        $q2->whereIn('transactions.account_id', $accountIds);
-                        // opposing.account_id not in set
-                        $q2->whereNotIn('opposing.account_id', $accountIds);
-
-                    }
-                );
-                // set 1:
-                // where source is not in the set of $accounts
-                // but destination is.
-                $q1->orWhere(
-                    function (EloquentBuilder $q3) use ($accountIds) {
-                        // transactions.account_id not in set
-                        $q3->whereNotIn('transactions.account_id', $accountIds);
-                        // B in set
-                        // opposing.account_id not in set
-                        $q3->whereIn('opposing.account_id', $accountIds);
-                    }
-                );
-            }
-        );
 
         return $this;
     }
@@ -556,86 +599,23 @@ class JournalCollector implements JournalCollectorInterface
      *
      * @return Collection
      */
-    private function filterInternalTransfers(Collection $set): Collection
+    private function filter(Collection $set): Collection
     {
-        if ($this->filterInternalTransfers === false) {
-            Log::debug('Did NO filtering for internal transfers on given set.');
-
-            return $set;
-        }
-        if ($this->joinedOpposing === false) {
-            Log::info('Cannot filter internal transfers because no opposing information is present.');
-
-            return $set;
-        }
-
-        $accountIds = $this->accountIds;
-        $set        = $set->filter(
-            function (Transaction $transaction) use ($accountIds) {
-                // both id's in $accountids?
-                if (in_array($transaction->account_id, $accountIds) && in_array($transaction->opposing_account_id, $accountIds)) {
-                    Log::debug(
-                        sprintf(
-                            'Transaction #%d has #%d and #%d in set, so removed',
-                            $transaction->id, $transaction->account_id, $transaction->opposing_account_id
-                        ), $accountIds
-                    );
-
-                    return false;
-                }
-
-                return $transaction;
-
+        // create all possible filters:
+        $filters = [
+            InternalTransferFilter::class => new InternalTransferFilter($this->accountIds),
+            OpposingAccountFilter::class  => new OpposingAccountFilter($this->accountIds),
+            TransferFilter::class         => new TransferFilter,
+            PositiveAmountFilter::class   => new PositiveAmountFilter,
+            NegativeAmountFilter::class   => new NegativeAmountFilter,
+        ];
+        Log::debug(sprintf('Will run %d filters on the set.', count($this->filters)));
+        foreach ($this->filters as $enabled) {
+            if (isset($filters[$enabled])) {
+                Log::debug(sprintf('Before filter %s: %d', $enabled, $set->count()));
+                $set = $filters[$enabled]->filter($set);
+                Log::debug(sprintf('After filter %s: %d', $enabled, $set->count()));
             }
-        );
-
-        return $set;
-    }
-
-    /**
-     * If the set of accounts used by the collector includes more than one asset
-     * account, chances are the set include double entries: transfers get selected
-     * on both the source, and then again on the destination account.
-     *
-     * This method filters them out.
-     *
-     * @param Collection $set
-     *
-     * @return Collection
-     */
-    private function filterTransfers(Collection $set): Collection
-    {
-        if ($this->filterTransfers) {
-            $set = $set->filter(
-                function (Transaction $transaction) {
-                    if (!($transaction->transaction_type_type === TransactionType::TRANSFER && bccomp($transaction->transaction_amount, '0') === -1)) {
-
-                        Log::debug(
-                            sprintf(
-                                'Included journal #%d (transaction #%d) because its a %s with amount %f',
-                                $transaction->transaction_journal_id,
-                                $transaction->id,
-                                $transaction->transaction_type_type,
-                                $transaction->transaction_amount
-                            )
-                        );
-
-                        return $transaction;
-                    }
-
-                    Log::debug(
-                        sprintf(
-                            'Removed journal #%d (transaction #%d) because its a %s with amount %f',
-                            $transaction->transaction_journal_id,
-                            $transaction->id,
-                            $transaction->transaction_type_type,
-                            $transaction->transaction_amount
-                        )
-                    );
-
-                    return false;
-                }
-            );
         }
 
         return $set;
@@ -653,6 +633,8 @@ class JournalCollector implements JournalCollectorInterface
             $this->query->leftJoin('budgets as transaction_journal_budgets', 'transaction_journal_budgets.id', '=', 'budget_transaction_journal.budget_id');
             $this->query->leftJoin('budget_transaction', 'budget_transaction.transaction_id', '=', 'transactions.id');
             $this->query->leftJoin('budgets as transaction_budgets', 'transaction_budgets.id', '=', 'budget_transaction.budget_id');
+            $this->query->whereNull('transaction_journal_budgets.deleted_at');
+            $this->query->whereNull('transaction_budgets.deleted_at');
 
             $this->fields[] = 'budget_transaction_journal.budget_id as transaction_journal_budget_id';
             $this->fields[] = 'transaction_journal_budgets.encrypted as transaction_journal_budget_encrypted';
@@ -709,9 +691,12 @@ class JournalCollector implements JournalCollectorInterface
             $this->query->leftJoin('account_types as opposing_account_types', 'opposing_accounts.account_type_id', '=', 'opposing_account_types.id');
             $this->query->whereNull('opposing.deleted_at');
 
-            $this->fields[]       = 'opposing.account_id as opposing_account_id';
-            $this->fields[]       = 'opposing_accounts.name as opposing_account_name';
-            $this->fields[]       = 'opposing_accounts.encrypted as opposing_account_encrypted';
+            $this->fields[] = 'opposing.id as opposing_id';
+            $this->fields[] = 'opposing.account_id as opposing_account_id';
+            $this->fields[] = 'opposing_accounts.name as opposing_account_name';
+            $this->fields[] = 'opposing_accounts.encrypted as opposing_account_encrypted';
+            $this->fields[] = 'opposing_accounts.iban as opposing_account_iban';
+
             $this->fields[]       = 'opposing_account_types.type as opposing_account_type';
             $this->joinedOpposing = true;
             Log::debug('joinedOpposing is now true!');
@@ -728,28 +713,5 @@ class JournalCollector implements JournalCollectorInterface
             $this->joinedTag = true;
             $this->query->leftJoin('tag_transaction_journal', 'tag_transaction_journal.transaction_journal_id', '=', 'transaction_journals.id');
         }
-    }
-
-    /**
-     * @return EloquentBuilder
-     */
-    private function startQuery(): EloquentBuilder
-    {
-        /** @var EloquentBuilder $query */
-        $query = Transaction::leftJoin('transaction_journals', 'transaction_journals.id', '=', 'transactions.transaction_journal_id')
-                            ->leftJoin('transaction_currencies', 'transaction_currencies.id', 'transaction_journals.transaction_currency_id')
-                            ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
-                            ->leftJoin('bills', 'bills.id', 'transaction_journals.bill_id')
-                            ->leftJoin('accounts', 'accounts.id', '=', 'transactions.account_id')
-                            ->leftJoin('account_types', 'accounts.account_type_id', 'account_types.id')
-                            ->whereNull('transactions.deleted_at')
-                            ->whereNull('transaction_journals.deleted_at')
-                            ->where('transaction_journals.user_id', $this->user->id)
-                            ->orderBy('transaction_journals.date', 'DESC')
-                            ->orderBy('transaction_journals.order', 'ASC')
-                            ->orderBy('transaction_journals.id', 'DESC');
-
-        return $query;
-
     }
 }

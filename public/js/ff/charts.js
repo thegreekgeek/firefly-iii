@@ -1,11 +1,21 @@
 /*
  * charts.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 /** global: Chart, defaultChartOptions, accounting, defaultPieOptions, noDataForChart */
 var allCharts = {};
@@ -38,7 +48,7 @@ var strokePointHighColors = [];
 
 
 for (var i = 0; i < colourSet.length; i++) {
-    fillColors.push("rgba(" + colourSet[i][0] + ", " + colourSet[i][1] + ", " + colourSet[i][2] + ", 0.2)");
+    fillColors.push("rgba(" + colourSet[i][0] + ", " + colourSet[i][1] + ", " + colourSet[i][2] + ", 0.5)");
     strokePointHighColors.push("rgba(" + colourSet[i][0] + ", " + colourSet[i][1] + ", " + colourSet[i][2] + ", 0.9)");
 }
 
@@ -60,7 +70,8 @@ function colorizeData(data) {
     for (var i = 0; i < data.count; i++) {
         newData.labels = data.labels;
         var dataset = data.datasets[i];
-        dataset.backgroundColor = fillColors[i];
+        dataset.fill = false;
+        dataset.backgroundColor = dataset.borderColor = fillColors[i];
         newData.datasets.push(dataset);
     }
     return newData;
@@ -75,7 +86,7 @@ function lineChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     var chartType = 'line';
 
     drawAChart(URI, container, chartType, options, colorData);
@@ -91,7 +102,7 @@ function doubleYChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     options.scales.yAxes = [
         // y axis 0:
         {
@@ -141,7 +152,7 @@ function doubleYNonStackedChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     options.scales.yAxes = [
         // y axis 0:
         {
@@ -186,9 +197,8 @@ function doubleYNonStackedChart(URI, container) {
  */
 function columnChart(URI, container) {
     "use strict";
-
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
     var chartType = 'bar';
 
     drawAChart(URI, container, chartType, options, colorData);
@@ -204,9 +214,11 @@ function stackedColumnChart(URI, container) {
     "use strict";
 
     var colorData = true;
-    var options = defaultChartOptions;
+    var options = $.extend(true, {}, defaultChartOptions);
+
     options.stacked = true;
     options.scales.xAxes[0].stacked = true;
+    options.scales.yAxes[0].stacked = true;
 
     var chartType = 'bar';
 
@@ -222,7 +234,7 @@ function pieChart(URI, container) {
     "use strict";
 
     var colorData = false;
-    var options = defaultPieOptions;
+    var options = $.extend(true, {}, defaultPieOptions);
     var chartType = 'pie';
 
     drawAChart(URI, container, chartType, options, colorData);
@@ -238,13 +250,14 @@ function pieChart(URI, container) {
  * @param colorData
  */
 function drawAChart(URI, container, chartType, options, colorData) {
-    if ($('#' + container).length === 0) {
+    var containerObj = $('#' + container);
+    if (containerObj.length === 0) {
         return;
     }
 
 
     $.getJSON(URI).done(function (data) {
-        $('#' + container).removeClass('general-chart-error');
+        containerObj.removeClass('general-chart-error');
         if (data.labels.length === 0) {
             // remove the chart container + parent
             var holder = $('#' + container).parent().parent();

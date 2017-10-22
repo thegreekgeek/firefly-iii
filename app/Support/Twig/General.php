@@ -1,15 +1,25 @@
 <?php
 /**
  * General.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support\Twig;
 
@@ -17,6 +27,7 @@ use Carbon\Carbon;
 use FireflyIII\Models\Account;
 use FireflyIII\Models\TransactionJournal;
 use Route;
+use Steam;
 use Twig_Extension;
 use Twig_SimpleFilter;
 use Twig_SimpleFunction;
@@ -37,12 +48,10 @@ class General extends Twig_Extension
     public function getFilters(): array
     {
         return [
-            $this->formatAmount(),
-            $this->formatAmountPlain(),
-            $this->formatJournal(),
             $this->balance(),
             $this->formatFilesize(),
             $this->mimeIcon(),
+
         ];
 
     }
@@ -59,8 +68,10 @@ class General extends Twig_Extension
             $this->env(),
             $this->getAmountFromJournal(),
             $this->activeRouteStrict(),
+            $this->steamPositive(),
             $this->activeRoutePartial(),
             $this->activeRoutePartialWhat(),
+
         ];
 
     }
@@ -110,7 +121,7 @@ class General extends Twig_Extension
             $what       = $args[2]; // name of the route.
             $activeWhat = $context['what'] ?? false;
 
-            if ($what == $activeWhat && !(strpos(Route::getCurrentRoute()->getName(), $route) === false)) {
+            if ($what === $activeWhat && !(strpos(Route::getCurrentRoute()->getName(), $route) === false)) {
                 return 'active';
             }
 
@@ -132,7 +143,7 @@ class General extends Twig_Extension
             $args  = func_get_args();
             $route = $args[0]; // name of the route.
 
-            if (Route::getCurrentRoute()->getName() == $route) {
+            if (Route::getCurrentRoute()->getName() === $route) {
                 return 'active';
             }
 
@@ -147,7 +158,7 @@ class General extends Twig_Extension
     protected function balance(): Twig_SimpleFilter
     {
         return new Twig_SimpleFilter(
-            'balance', function (Account $account = null): string {
+            'balance', function (?Account $account): string {
             if (is_null($account)) {
                 return 'NULL';
             }
@@ -167,33 +178,6 @@ class General extends Twig_Extension
             'env', function (string $name, string $default): string {
             return env($name, $default);
         }
-        );
-    }
-
-    /**
-     *
-     * @return Twig_SimpleFilter
-     */
-    protected function formatAmount(): Twig_SimpleFilter
-    {
-        return new Twig_SimpleFilter(
-            'formatAmount', function (string $string): string {
-
-            return app('amount')->format($string);
-        }, ['is_safe' => ['html']]
-        );
-    }
-
-    /**
-     * @return Twig_SimpleFilter
-     */
-    protected function formatAmountPlain(): Twig_SimpleFilter
-    {
-        return new Twig_SimpleFilter(
-            'formatAmountPlain', function (string $string): string {
-
-            return app('amount')->format($string, false);
-        }, ['is_safe' => ['html']]
         );
     }
 
@@ -220,17 +204,6 @@ class General extends Twig_Extension
         );
     }
 
-    /**
-     * @return Twig_SimpleFilter
-     */
-    protected function formatJournal(): Twig_SimpleFilter
-    {
-        return new Twig_SimpleFilter(
-            'formatJournal', function (TransactionJournal $journal): string {
-            return app('amount')->formatJournal($journal);
-        }, ['is_safe' => ['html']]
-        );
-    }
 
     /**
      * @return Twig_SimpleFunction
@@ -291,11 +264,23 @@ class General extends Twig_Extension
     /**
      * @return Twig_SimpleFunction
      */
+    protected function steamPositive()
+    {
+        return new Twig_SimpleFunction(
+            'steam_positive', function (string $str): string {
+            return Steam::positive($str);
+        }
+        );
+    }
+
+    /**
+     * @return Twig_SimpleFunction
+     */
     private function getAmountFromJournal()
     {
         return new Twig_SimpleFunction(
             'getAmount', function (TransactionJournal $journal): string {
-            return TransactionJournal::amount($journal);
+            return $journal->amount();
         }
         );
     }

@@ -1,25 +1,39 @@
 <?php
 /**
  * UserEventHandler.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Handlers\Events;
 
 use FireflyIII\Events\RegisteredUser;
 use FireflyIII\Events\RequestedNewPassword;
+use FireflyIII\Events\UserChangedEmail;
+use FireflyIII\Mail\ConfirmEmailChangeMail;
+use FireflyIII\Mail\RegisteredUser as RegisteredUserMail;
+use FireflyIII\Mail\RequestedNewPassword as RequestedNewPasswordMail;
+use FireflyIII\Mail\UndoEmailChangeMail;
 use FireflyIII\Repositories\User\UserRepositoryInterface;
-use Illuminate\Mail\Message;
 use Log;
 use Mail;
-use Session;
+use Preferences;
 use Swift_TransportException;
 
 /**
@@ -55,16 +69,50 @@ class UserEventHandler
     }
 
     /**
-     * Handle user logout events.
+     * @param UserChangedEmail $event
      *
      * @return bool
      */
-    public function logoutUser(): bool
+    public function sendEmailChangeConfirmMail(UserChangedEmail $event): bool
     {
-        // dump stuff from the session:
-        Session::forget('twofactor-authenticated');
-        Session::forget('twofactor-authenticated-date');
+        $newEmail  = $event->newEmail;
+        $oldEmail  = $event->oldEmail;
+        $user      = $event->user;
+        $ipAddress = $event->ipAddress;
+        $token     = Preferences::getForUser($user, 'email_change_confirm_token', 'invalid');
+        $uri       = route('profile.confirm-email-change', [$token->data]);
+        try {
+            Mail::to($newEmail)->send(new ConfirmEmailChangeMail($newEmail, $oldEmail, $uri, $ipAddress));
+            // @codeCoverageIgnoreStart
+        } catch (Swift_TransportException $e) {
+            Log::error($e->getMessage());
+        }
 
+        // @codeCoverageIgnoreEnd
+        return true;
+    }
+
+    /**
+     * @param UserChangedEmail $event
+     *
+     * @return bool
+     */
+    public function sendEmailChangeUndoMail(UserChangedEmail $event): bool
+    {
+        $newEmail  = $event->newEmail;
+        $oldEmail  = $event->oldEmail;
+        $user      = $event->user;
+        $ipAddress = $event->ipAddress;
+        $token     = Preferences::getForUser($user, 'email_change_undo_token', 'invalid');
+        $uri       = route('profile.undo-email-change', [$token->data, hash('sha256', $oldEmail)]);
+        try {
+            Mail::to($oldEmail)->send(new UndoEmailChangeMail($newEmail, $oldEmail, $uri, $ipAddress));
+            // @codeCoverageIgnoreStart
+        } catch (Swift_TransportException $e) {
+            Log::error($e->getMessage());
+        }
+
+        // @codeCoverageIgnoreEnd
         return true;
     }
 
@@ -83,14 +131,13 @@ class UserEventHandler
 
         // send email.
         try {
-            Mail::send(
-                ['emails.password-html', 'emails.password-text'], ['url' => $url, 'ip' => $ipAddress], function (Message $message) use ($email) {
-                $message->to($email, $email)->subject('Your password reset request');
-            }
-            );
+            Mail::to($email)->send(new RequestedNewPasswordMail($url, $ipAddress));
+            // @codeCoverageIgnoreStart
         } catch (Swift_TransportException $e) {
             Log::error($e->getMessage());
         }
+
+        // @codeCoverageIgnoreEnd
 
         return true;
     }
@@ -108,22 +155,22 @@ class UserEventHandler
 
         $sendMail = env('SEND_REGISTRATION_MAIL', true);
         if (!$sendMail) {
-            return true;
+            return true; // @codeCoverageIgnore
         }
         // get the email address
         $email     = $event->user->email;
-        $address   = route('index');
+        $uri       = route('index');
         $ipAddress = $event->ipAddress;
+
         // send email.
         try {
-            Mail::send(
-                ['emails.registered-html', 'emails.registered-text'], ['address' => $address, 'ip' => $ipAddress], function (Message $message) use ($email) {
-                $message->to($email, $email)->subject('Welcome to Firefly III!');
-            }
-            );
+            Mail::to($email)->send(new RegisteredUserMail($uri, $ipAddress));
+            // @codeCoverageIgnoreStart
         } catch (Swift_TransportException $e) {
             Log::error($e->getMessage());
         }
+
+        // @codeCoverageIgnoreEnd
 
         return true;
     }

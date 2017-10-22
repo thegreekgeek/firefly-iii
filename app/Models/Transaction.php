@@ -1,15 +1,25 @@
 <?php
 /**
  * Transaction.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -22,18 +32,61 @@ use Watson\Validating\ValidatingTrait;
 /**
  * Class Transaction
  *
+ * @property-read int    $journal_id
+ * @property Carbon      $date
+ * @property-read string $transaction_description
+ * @property string      $transaction_amount
+ * @property string      $transaction_foreign_amount
+ * @property string      $transaction_type_type
+ * @property string      $foreign_currency_symbol
+ * @property int         $foreign_currency_dp
+ *
+ * @property int         $account_id
+ * @property string      $account_name
+ * @property string      $account_iban
+ * @property string      $account_number
+ * @property string      $account_bic
+ * @property string      $account_currency_code
+ *
+ * @property int         $opposing_account_id
+ * @property string      $opposing_account_name
+ * @property string      $opposing_account_iban
+ * @property string      $opposing_account_number
+ * @property string      $opposing_account_bic
+ * @property string      $opposing_currency_code
+ *
+ *
+ * @property int         $transaction_budget_id
+ * @property string      $transaction_budget_name
+ * @property int         $transaction_journal_budget_id
+ * @property string      $transaction_journal_budget_name
+ *
+ * @property-read int    $transaction_category_id
+ * @property-read string $transaction_category_name
+ * @property-read int    $transaction_journal_category_id
+ * @property-read string $transaction_journal_category_name
+ *
+ * @property-read int    $bill_id
+ * @property string      $bill_name
+ *
+ * @property string      $notes
+ * @property string      $tags
+ *
+ * @property string      $transaction_currency_symbol
+ * @property int         $transaction_currency_dp
+ * @property string      $transaction_currency_code
+ *
  * @package FireflyIII\Models
  */
 class Transaction extends Model
 {
-
     /**
      * The attributes that should be casted to native types.
      *
      * @var array
      */
     protected $casts
-                        = [
+                      = [
             'created_at'          => 'date',
             'updated_at'          => 'date',
             'deleted_at'          => 'date',
@@ -41,17 +94,19 @@ class Transaction extends Model
             'encrypted'           => 'boolean', // model does not have these fields though
             'bill_name_encrypted' => 'boolean',
         ];
-    protected $dates    = ['created_at', 'updated_at', 'deleted_at'];
-    protected $fillable = ['account_id', 'transaction_journal_id', 'description', 'amount', 'identifier'];
-    protected $hidden   = ['encrypted'];
+    protected $dates  = ['created_at', 'updated_at', 'deleted_at'];
+    protected $fillable
+                      = ['account_id', 'transaction_journal_id', 'description', 'amount', 'identifier', 'transaction_currency_id', 'foreign_currency_id',
+                         'foreign_amount'];
+    protected $hidden = ['encrypted'];
     protected $rules
-                        = [
-            'account_id'             => 'required|exists:accounts,id',
-            'transaction_journal_id' => 'required|exists:transaction_journals,id',
-            'description'            => 'between:0,1024',
-            'amount'                 => 'required|numeric',
+                      = [
+            'account_id'              => 'required|exists:accounts,id',
+            'transaction_journal_id'  => 'required|exists:transaction_journals,id',
+            'transaction_currency_id' => 'required|exists:transaction_currencies,id',
+            'description'             => 'between:0,1024',
+            'amount'                  => 'required|numeric',
         ];
-    use SoftDeletes, ValidatingTrait;
 
     /**
      * @param Builder $query
@@ -73,6 +128,8 @@ class Transaction extends Model
 
         return false;
     }
+
+    use SoftDeletes, ValidatingTrait;
 
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
@@ -96,6 +153,14 @@ class Transaction extends Model
     public function categories()
     {
         return $this->belongsToMany('FireflyIII\Models\Category');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function foreignCurrency()
+    {
+        return $this->belongsTo('FireflyIII\Models\TransactionCurrency', 'foreign_currency_id');
     }
 
     /**
@@ -158,6 +223,14 @@ class Transaction extends Model
     public function setAmountAttribute($value)
     {
         $this->attributes['amount'] = strval(round($value, 12));
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function transactionCurrency()
+    {
+        return $this->belongsTo('FireflyIII\Models\TransactionCurrency');
     }
 
     /**

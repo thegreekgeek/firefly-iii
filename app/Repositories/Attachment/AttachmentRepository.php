@@ -1,25 +1,36 @@
 <?php
 /**
  * AttachmentRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Attachment;
 
 use Carbon\Carbon;
+use Crypt;
 use FireflyIII\Helpers\Attachments\AttachmentHelperInterface;
 use FireflyIII\Models\Attachment;
 use FireflyIII\User;
 use Illuminate\Support\Collection;
+use Log;
 use Storage;
-use Crypt;
 
 /**
  * Class AttachmentRepository
@@ -30,16 +41,6 @@ class AttachmentRepository implements AttachmentRepositoryInterface
 {
     /** @var User */
     private $user;
-
-    /**
-     * AttachmentRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @param Attachment $attachment
@@ -69,6 +70,36 @@ class AttachmentRepository implements AttachmentRepositoryInterface
         $disk = Storage::disk('upload');
 
         return $disk->exists($attachment->fileName());
+    }
+
+    /**
+     * @param int $id
+     *
+     * @return Attachment
+     */
+    public function find(int $id): Attachment
+    {
+        $attachment = $this->user->attachments()->find($id);
+        if (is_null($attachment)) {
+            return new Attachment;
+        }
+
+        return $attachment;
+    }
+
+    /**
+     * @param int $id
+     *
+     * @return Attachment
+     */
+    public function findWithoutUser(int $id): Attachment
+    {
+        $attachment = Attachment::find($id);
+        if (is_null($attachment)) {
+            return new Attachment;
+        }
+
+        return $attachment;
     }
 
     /**
@@ -105,16 +136,28 @@ class AttachmentRepository implements AttachmentRepositoryInterface
     public function getContent(Attachment $attachment): string
     {
         // create a disk.
-        $disk = Storage::disk('upload');
-        $file = $attachment->fileName();
+        $disk    = Storage::disk('upload');
+        $file    = $attachment->fileName();
+        $content = '';
 
         if ($disk->exists($file)) {
             $content = Crypt::decrypt($disk->get($file));
+        }
+        if (is_bool($content)) {
+            Log::error(sprintf('Attachment #%d may be corrupted: the content could not be decrypted.', $attachment->id));
 
-            return $content;
+            return '';
         }
 
-        return '';
+        return $content;
+    }
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
     }
 
     /**

@@ -1,11 +1,21 @@
 /*
  * all.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /** global: accountReportUri, incomeReportUri, expenseReportUri, incExpReportUri, startDate, endDate, accountIds */
@@ -99,9 +109,9 @@ function displayAjaxPartial(data, holder) {
 
 function failAjaxPartial(uri, holder) {
     "use strict";
-    var holder = $('#' + holder);
-    holder.parent().find('.overlay').remove();
-    holder.addClass('general-chart-error');
+    var holderObject = $('#' + holder);
+    holderObject.parent().find('.overlay').remove();
+    holderObject.addClass('general-chart-error');
 
 }
 
@@ -109,6 +119,7 @@ function clickCategoryChart(e) {
     "use strict";
     var link = $(e.target);
     var categoryId = link.data('category');
+    $('#category_help').remove();
 
     var URL = 'chart/category/report-period/' + categoryId + '/' + accountIds + '/' + startDate + '/' + endDate;
     var container = 'category_chart';
@@ -120,6 +131,7 @@ function clickBudgetChart(e) {
     "use strict";
     var link = $(e.target);
     var budgetId = link.data('budget');
+    $('#budget_help').remove();
 
     var URL = 'chart/budget/period/' + budgetId + '/' + accountIds + '/' + startDate + '/' + endDate;
     var container = 'budget_chart';

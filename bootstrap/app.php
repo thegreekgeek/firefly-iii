@@ -1,15 +1,5 @@
 <?php
-/**
- * app.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
- *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
- *
- * See the LICENSE file for details.
- */
-
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 /*
@@ -23,7 +13,12 @@ declare(strict_types = 1);
 |
 */
 
+use Monolog\Formatter\LineFormatter;
+use Monolog\Handler\RotatingFileHandler;
+use Monolog\Logger;
+
 bcscale(12);
+
 
 $app = new Illuminate\Foundation\Application(
     realpath(__DIR__.'/../')
@@ -40,7 +35,6 @@ $app = new Illuminate\Foundation\Application(
 |
 */
 
-
 $app->singleton(
     Illuminate\Contracts\Http\Kernel::class,
     FireflyIII\Http\Kernel::class
@@ -54,6 +48,35 @@ $app->singleton(
 $app->singleton(
     Illuminate\Contracts\Debug\ExceptionHandler::class,
     FireflyIII\Exceptions\Handler::class
+);
+
+/* Overrule logging */
+$app->configureMonologUsing(
+    function (Logger $monolog) use ($app) {
+        $interface = php_sapi_name();
+        $path      = $app->storagePath() . '/logs/ff3-' . $interface . '.log';
+        $level     = 'debug';
+        if ($app->bound('config')) {
+            $level = $app->make('config')->get('app.log_level', 'debug');
+        }
+        $levels = [
+            'debug'     => Logger::DEBUG,
+            'info'      => Logger::INFO,
+            'notice'    => Logger::NOTICE,
+            'warning'   => Logger::WARNING,
+            'error'     => Logger::ERROR,
+            'critical'  => Logger::CRITICAL,
+            'alert'     => Logger::ALERT,
+            'emergency' => Logger::EMERGENCY,
+        ];
+
+        $useLevel = $levels[$level];
+
+        $formatter = new LineFormatter(null, null, true, true);
+        $handler   = new RotatingFileHandler($path, 5, $useLevel);
+        $handler->setFormatter($formatter);
+        $monolog->pushHandler($handler);
+    }
 );
 
 /*

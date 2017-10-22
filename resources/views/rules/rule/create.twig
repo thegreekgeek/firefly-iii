@@ -12,7 +12,7 @@
         <input type="hidden" name="active" value="1"/>
         <div class="row">
             <div class="col-lg-6 col-md-6 col-sm-12">
-                <div class="box box-primary">
+                <div class="box box-primary" id="mandatory">
                     <div class="box-header with-border">
                         <h3 class="box-title">{{ 'mandatoryFields'|_ }}</h3>
                     </div>
@@ -80,7 +80,7 @@
                     <div class="box-header with-border">
                         <h3 class="box-title">{{ 'rule_actions'|_ }}</h3>
                     </div>
-                    <div class="box-body">
+                    <div class="box-body rule-action-box">
                         <table class="table table-condensed table-bordered table-striped">
                             <thead>
                             <tr>
@@ -127,12 +127,12 @@
 
 {% endblock %}
 {% block scripts %}
-    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js"></script>
+    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js?v={{ FF_VERSION }}"></script>
     <script type="text/javascript">
         var triggerCount = {{ triggerCount }};
         var actionCount = {{ actionCount }};
     </script>
-    <script type="text/javascript" src="js/ff/rules/create-edit.js"></script>
+    <script type="text/javascript" src="js/ff/rules/create-edit.js?v={{ FF_VERSION }}"></script>
 
 {% endblock %}
 {% block styles %}

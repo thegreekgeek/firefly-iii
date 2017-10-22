@@ -1,11 +1,21 @@
 /*
  * index.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 var fixHelper = function (e, tr) {
@@ -25,7 +35,7 @@ $(function () {
           {
               helper: fixHelper,
               stop: sortStop,
-              cursor: "move",
+              cursor: "move"
           }
       );
 
@@ -37,8 +47,57 @@ $(function () {
 
           }
       );
+
+      // test rule triggers button:
+      $('.test_rule_triggers').click(testRuleTriggers);
   }
 );
+
+function testRuleTriggers(e) {
+
+    var obj = $(e.target);
+    var ruleId = parseInt(obj.data('id'));
+    var icon = obj;
+    if(obj.prop("tagName") === 'A') {
+        icon = $('i', obj);
+    }
+    // change icon:
+    icon.addClass('fa-spinner fa-spin').removeClass('fa-flask');
+
+    var modal = $("#testTriggerModal");
+    // respond to modal:
+    modal.on('hide.bs.modal', function (e) {
+        disableRuleSpinners();
+    });
+
+    // Find a list of existing transactions that match these triggers
+    $.get('rules/test-rule/' + ruleId).done(function (data) {
+
+
+        // Set title and body
+        modal.find(".transactions-list").html(data.html);
+
+        // Show warning if appropriate
+        if (data.warning) {
+            modal.find(".transaction-warning .warning-contents").text(data.warning);
+            modal.find(".transaction-warning").show();
+        } else {
+            modal.find(".transaction-warning").hide();
+        }
+
+        // Show the modal dialog
+        modal.modal();
+    }).fail(function () {
+        alert('Cannot get transactions for given triggers.');
+        disableRuleSpinners();
+    });
+
+    return false;
+}
+
+function disableRuleSpinners() {
+    $('i.test_rule_triggers').removeClass('fa-spin fa-spinner').addClass('fa-flask');
+}
 
 
 function sortStop(event, ui) {

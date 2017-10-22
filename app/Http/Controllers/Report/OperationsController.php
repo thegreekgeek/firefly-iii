@@ -1,24 +1,32 @@
 <?php
 /**
  * OperationsController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Report;
 
 
 use Carbon\Carbon;
-use FireflyIII\Helpers\Collector\JournalCollectorInterface;
 use FireflyIII\Http\Controllers\Controller;
-use FireflyIII\Models\Transaction;
-use FireflyIII\Models\TransactionType;
+use FireflyIII\Repositories\Account\AccountTaskerInterface;
 use FireflyIII\Support\CacheProperties;
 use Illuminate\Support\Collection;
 
@@ -31,13 +39,14 @@ class OperationsController extends Controller
 {
 
     /**
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
+     * @param AccountTaskerInterface $tasker
+     * @param Collection             $accounts
+     * @param Carbon                 $start
+     * @param Carbon                 $end
      *
      * @return mixed|string
      */
-    public function expenses(Collection $accounts, Carbon $start, Carbon $end)
+    public function expenses(AccountTaskerInterface $tasker, Collection $accounts, Carbon $start, Carbon $end)
     {
         // chart properties for cache:
         $cache = new CacheProperties;
@@ -46,9 +55,9 @@ class OperationsController extends Controller
         $cache->addProperty('expense-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
-        $entries = $this->getExpenseReport($start, $end, $accounts);
+        $entries = $tasker->getExpenseReport($start, $end, $accounts);
         $type    = 'expense-entry';
         $result  = view('reports.partials.income-expenses', compact('entries', 'type'))->render();
         $cache->store($result);
@@ -58,13 +67,14 @@ class OperationsController extends Controller
     }
 
     /**
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
+     * @param AccountTaskerInterface $tasker
+     * @param Collection             $accounts
+     * @param Carbon                 $start
+     * @param Carbon                 $end
      *
      * @return string
      */
-    public function income(Collection $accounts, Carbon $start, Carbon $end)
+    public function income(AccountTaskerInterface $tasker, Collection $accounts, Carbon $start, Carbon $end)
     {
         // chart properties for cache:
         $cache = new CacheProperties;
@@ -73,9 +83,9 @@ class OperationsController extends Controller
         $cache->addProperty('income-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
-        $entries = $this->getIncomeReport($start, $end, $accounts);
+        $entries = $tasker->getIncomeReport($start, $end, $accounts);
         $type    = 'income-entry';
         $result  = view('reports.partials.income-expenses', compact('entries', 'type'))->render();
 
@@ -86,13 +96,14 @@ class OperationsController extends Controller
     }
 
     /**
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
+     * @param AccountTaskerInterface $tasker
+     * @param Collection             $accounts
+     * @param Carbon                 $start
+     * @param Carbon                 $end
      *
      * @return mixed|string
      */
-    public function operations(Collection $accounts, Carbon $start, Carbon $end)
+    public function operations(AccountTaskerInterface $tasker, Collection $accounts, Carbon $start, Carbon $end)
     {
         // chart properties for cache:
         $cache = new CacheProperties;
@@ -101,11 +112,11 @@ class OperationsController extends Controller
         $cache->addProperty('inc-exp-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
 
-        $incomes   = $this->getIncomeReport($start, $end, $accounts);
-        $expenses  = $this->getExpenseReport($start, $end, $accounts);
+        $incomes   = $tasker->getIncomeReport($start, $end, $accounts);
+        $expenses  = $tasker->getExpenseReport($start, $end, $accounts);
         $incomeSum = array_sum(
             array_map(
                 function ($item) {
@@ -127,127 +138,6 @@ class OperationsController extends Controller
 
         return $result;
 
-    }
-
-    /**
-     * @param Carbon     $start
-     * @param Carbon     $end
-     * @param Collection $accounts
-     *
-     * @return array
-     */
-    private function getExpenseReport(Carbon $start, Carbon $end, Collection $accounts): array
-    {
-        // get all expenses for the given accounts in the given period!
-        // also transfers!
-        // get all transactions:
-        /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class);
-        $collector->setAccounts($accounts)->setRange($start, $end);
-        $collector->setTypes([TransactionType::WITHDRAWAL, TransactionType::TRANSFER])
-                  ->withOpposingAccount()
-                  ->enableInternalFilter();
-        $transactions = $collector->getJournals();
-        $transactions = $transactions->filter(
-            function (Transaction $transaction) {
-                // return negative amounts only.
-                if (bccomp($transaction->transaction_amount, '0') === -1) {
-                    return $transaction;
-                }
-
-                return false;
-            }
-        );
-        $expenses     = $this->groupByOpposing($transactions);
-
-        // sort the result
-        // Obtain a list of columns
-        $sum = [];
-        foreach ($expenses as $accountId => $row) {
-            $sum[$accountId] = floatval($row['sum']);
-        }
-
-        array_multisort($sum, SORT_ASC, $expenses);
-
-        return $expenses;
-    }
-
-    /**
-     * @param Carbon     $start
-     * @param Carbon     $end
-     * @param Collection $accounts
-     *
-     * @return array
-     */
-    private function getIncomeReport(Carbon $start, Carbon $end, Collection $accounts): array
-    {
-        // get all expenses for the given accounts in the given period!
-        // also transfers!
-        // get all transactions:
-        /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class);
-        $collector->setAccounts($accounts)->setRange($start, $end);
-        $collector->setTypes([TransactionType::DEPOSIT, TransactionType::TRANSFER])
-                  ->withOpposingAccount()
-                  ->enableInternalFilter();
-        $transactions = $collector->getJournals();
-        $transactions = $transactions->filter(
-            function (Transaction $transaction) {
-                // return positive amounts only.
-                if (bccomp($transaction->transaction_amount, '0') === 1) {
-                    return $transaction;
-                }
-
-                return false;
-            }
-        );
-        $income       = $this->groupByOpposing($transactions);
-
-        // sort the result
-        // Obtain a list of columns
-        $sum = [];
-        foreach ($income as $accountId => $row) {
-            $sum[$accountId] = floatval($row['sum']);
-        }
-
-        array_multisort($sum, SORT_DESC, $income);
-
-        return $income;
-    }
-
-    /**
-     * @param Collection $transactions
-     *
-     * @return array
-     */
-    private function groupByOpposing(Collection $transactions): array
-    {
-        $expenses = [];
-        // join the result together:
-        foreach ($transactions as $transaction) {
-            $opposingId = $transaction->opposing_account_id;
-            $name       = $transaction->opposing_account_name;
-            if (!isset($expenses[$opposingId])) {
-                $expenses[$opposingId] = [
-                    'id'      => $opposingId,
-                    'name'    => $name,
-                    'sum'     => '0',
-                    'average' => '0',
-                    'count'   => 0,
-                ];
-            }
-            $expenses[$opposingId]['sum'] = bcadd($expenses[$opposingId]['sum'], $transaction->transaction_amount);
-            $expenses[$opposingId]['count']++;
-        }
-        // do averages:
-        foreach ($expenses as $key => $entry) {
-            if ($expenses[$key]['count'] > 1) {
-                $expenses[$key]['average'] = bcdiv($expenses[$key]['sum'], strval($expenses[$key]['count']));
-            }
-        }
-
-
-        return $expenses;
     }
 
 }

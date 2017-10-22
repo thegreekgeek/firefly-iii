@@ -1,21 +1,32 @@
 <?php
 /**
  * JournalRepositoryInterface.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Journal;
 
 use FireflyIII\Models\Account;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Models\TransactionType;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\MessageBag;
 
@@ -38,9 +49,11 @@ interface JournalRepositoryInterface
     public function convert(TransactionJournal $journal, TransactionType $type, Account $source, Account $destination): MessageBag;
 
     /**
-     * @return Collection
+     * @param TransactionJournal $journal
+     *
+     * @return int
      */
-    public function getTransactionTypes(): Collection;
+    public function countTransactions(TransactionJournal $journal): int;
 
     /**
      * Deletes a journal.
@@ -67,6 +80,30 @@ interface JournalRepositoryInterface
      */
     public function first(): TransactionJournal;
 
+    /**
+     * @return Collection
+     */
+    public function getTransactionTypes(): Collection;
+
+    /**
+     * @param TransactionJournal $journal
+     *
+     * @return bool
+     */
+    public function isTransfer(TransactionJournal $journal): bool;
+
+    /**
+     * @param TransactionJournal $journal
+     * @param int                $order
+     *
+     * @return bool
+     */
+    public function setOrder(TransactionJournal $journal, int $order): bool;
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 
     /**
      * @param array $data

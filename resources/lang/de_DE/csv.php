@@ -9,40 +9,43 @@
  * See the LICENSE file for details.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
 
-    'import_configure_title' => 'Konfigurieren Sie Ihren Import',
-    'import_configure_intro' => 'Es gibt einige Optionen für Ihren CSV-Import. Bitte geben Sie an, ob Ihre CSV-Datei Überschriften in der ersten Spalte enthält und was das Datumsformat in Ihrem Datumsfeld ist. Dieses kann einige Experimente erfordern. Das Trennzeichen ist in der Regel ein ",", könnte aber auch ein "." sein. Bitte überprüfen Sie dieses sorgfältig.',
-    'import_configure_form'  => 'Standard CSV Importoptionen',
-    'header_help'            => 'Hier auswählen, wenn die ersten Zeilen der CSV-Datei die Spaltenüberschriften sind',
-    'date_help'              => 'Datumsformat in ihrer CSV-Datei. Geben Sie das Format so an, wie es <a href="https://secure.php.net/manual/en/datetime.createfromformat.php#refsect1-datetime.createfromformat-parameters">diese Seite</a> zeigt. Die Standardeinstellung ergibt Daten die so aussehen: :dateExample.',
-    'delimiter_help'         => 'Wählen Sie das Trennzeichen, welches in ihrer Datei genutzt wird. Wenn Sie nicht sicher sind ist Komma die sicherste Option.',
-    'import_account_help'    => 'Wenn ihre CSV-Datei KEINE Informationen über ihre Girokonten enthält nutzen Sie bitte diese Dropdown-Liste um anzugeben, zu welchem Girokonto die Transaktionen in de CSV-Datei gehören.',
-    'upload_not_writeable'   => 'Das graue Feld enthält einen Dateipfad. Dieser sollte schreibbar sein. Bitte stellen Sie sicher, dass er es ist.',
+    // initial config
+    'initial_title'                 => 'Import Einrichten (1/3) - Grundlegende Einstellungen',
+    'initial_text'                  => 'Um Ihre Datei korrekt importieren zu können, überprüfen Sie die folgenden Optionen.',
+    'initial_box'                   => 'Standard CSV Importeinstellungen',
+    'initial_box_title'             => 'Standard CSV Importoptionen',
+    'initial_header_help'           => 'Hier auswählen, wenn die ersten Zeilen der CSV-Datei die Spaltenüberschriften sind.',
+    'initial_date_help'             => 'Datumsformat in ihrer CSV-Datei. Geben Sie das Format so an, wie es <a href="https://secure.php.net/manual/en/datetime.createfromformat.php#refsect1-datetime.createfromformat-parameters">diese Seite</a> zeigt. Die Standardeinstellung ergibt Daten die so aussehen: :dateExample.',
+    'initial_delimiter_help'        => 'Wählen Sie das Trennzeichen, welches in ihrer Datei genutzt wird. Wenn Sie nicht sicher sind ist Komma die sicherste Option.',
+    'initial_import_account_help'   => 'Wenn ihre CSV-Datei KEINE Informationen über ihre Girokonten enthält nutzen Sie bitte diese Dropdown-Liste um anzugeben, zu welchem Girokonto die Transaktionen in der CSV-Datei gehören.',
+    'initial_submit'                => 'Fortfahren mit Schritt 2/3',
 
-    // roles
-    'column_roles_title'     => 'Definieren Sie Spaltenfunktionen',
-    'column_roles_table'     => 'Tabelle',
-    'column_name'            => 'Name der Spalte',
-    'column_example'         => 'Beispieldaten',
-    'column_role'            => 'Bedeutung der Spalte',
-    'do_map_value'           => 'Ordnen Sie diese Werte zu',
-    'column'                 => 'Spalte',
-    'no_example_data'        => 'Keine Beispieldaten vorhanden',
-    'store_column_roles'     => 'Import fortsetzen',
-    'do_not_map'             => '(keine Zuordnung)',
-    'map_title'              => 'Verbinde Importdaten mit Firefly III Daten',
-    'map_text'               => 'In den folgenden Tabellen zeigt der linke Wert Informationen, die sich in Ihrer hochgeladenen CSV-Datei befinden. Es ist Ihre Aufgabe, diesen Wert, wenn möglich, einem bereits in der Datenbank vorhandem zuzuordnen. Firefly wird sich an diese Zuordnung halten. Wenn kein Wert für die Zuordnung vorhanden ist oder Sie den bestimmten Wert nicht abbilden möchten, wählen Sie nichts aus.',
+    // roles config
+    'roles_title'                   => 'Import Einrichten (2/3) - Jeder Spalte eine Rolle zuordnen',
+    'roles_text'                    => 'Jede Spalte in Ihrer CSV-Datei enthält bestimmte Daten. Bitte geben Sie an, welche Art von Daten enthalten sind. Die Option "Daten zuordnen" bedeutet, dass jeder Eintrag in der Spalte mit einem Wert aus Ihrer der Datenbank ersetzt wird. Eine oft zugeordnete Spalte ist die Spalte, welche die IBAN des fremden Kontos enthält. Diese können leicht mit bereits angelegten IBANs in Ihrer Datenbank verglichen werden.',
+    'roles_table'                   => 'Tabelle',
+    'roles_column_name'             => 'Name der Spalte',
+    'roles_column_example'          => 'Beispieldaten',
+    'roles_column_role'             => 'Bedeutung der Spalte',
+    'roles_do_map_value'            => 'Ordnen Sie diese Werte zu',
+    'roles_column'                  => 'Spalte',
+    'roles_no_example_data'         => 'Keine Beispieldaten vorhanden',
+    'roles_submit'                  => 'Fortfahren mit Schritt 3/3',
+    'roles_warning'                 => 'Markieren Sie zumindest eine Spalte als Betrags-spalte. Es empfiehlt sich auch, eine Spalte für die Beschreibung, das Datum und das Gegenkonto auszuwählen.',
 
-    'field_value'          => 'Feldwert',
-    'field_mapped_to'      => 'Zugeordnet zu',
-    'store_column_mapping' => 'Speicherzuordnung',
+    // map data
+    'map_title'                     => 'Import Einrichten (3/3) - Import mit bereits vorhandenen Daten verknüpfen',
+    'map_text'                      => 'In den folgenden Tabellen zeigt der linke Wert Informationen, die sich in Ihrer hochgeladenen CSV-Datei befinden. Es ist Ihre Aufgabe, diesen Wert, wenn möglich, einem bereits in der Datenbank vorhandenen zuzuordnen. Firefly wird sich an diese Zuordnung halten. Wenn kein Wert für die Zuordnung vorhanden ist oder Sie den bestimmten Wert nicht abbilden möchten, wählen Sie nichts aus.',
+    'map_field_value'               => 'Feldwert',
+    'map_field_mapped_to'           => 'Zugeordnet zu',
+    'map_do_not_map'                => '(keine Zuordnung)',
+    'map_submit'                    => 'Starte den Import',
 
     // map things.
-
-
     'column__ignore'                => '(diese Spalte ignorieren)',
     'column_account-iban'           => 'Bestandskonto (IBAN)',
     'column_account-id'             => 'Bestandskonto (vgl. ID in Firefly)',
@@ -51,7 +54,7 @@ return [
     'column_amount-comma-separated' => 'Betrag (Komma als Dezimaltrennzeichen)',
     'column_bill-id'                => 'Rechnung (ID übereinstimmend mit Firefly)',
     'column_bill-name'              => 'Name der Rechnung',
-    'column_budget-id'              => 'Bidget (ID übereinstimmend mit Firefly)',
+    'column_budget-id'              => 'Budget (ID übereinstimmend mit Firefly)',
     'column_budget-name'            => 'Budgetname',
     'column_category-id'            => 'Kategorie (ID übereinstimmend mit Firefly)',
     'column_category-name'          => 'Name der Kategorie',

@@ -13,11 +13,21 @@
         </div>
     {% endif %}
 
+    {# SUCCESS MESSAGE (ALWAYS SINGULAR) #}
+    {% if Session.has('success') %}
+        <div class="alert alert-success alert-dismissible" role="alert">
+            <button type="button" class="close" data-dismiss="alert">
+                <span>&times;</span><span class="sr-only">{{ 'close'|_ }}</span>
+            </button>
+            <strong>{{ 'flash_success'|_ }}</strong> {{ session('success') }}
+        </div>
+    {% endif %}
+
     {% if errors.has('email') %}
         <div class="row">
             <div class="col-lg-12">
                 <div class="alert alert-danger alert-dismissible" role="alert">
-                    <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">{{ 'close'|_ }}</span>
+                    <button type="button" class="close" data-dismiss="alert"><span>&times;</span><span class="sr-only">{{ 'close'|_ }}</span>
                     </button>
                     <strong>Error!</strong> {{ errors.get('email')[0] }}
                 </div>
@@ -29,7 +39,7 @@
         <div class="row">
             <div class="col-lg-12">
                 <div class="alert alert-info alert-dismissible" role="alert">
-                    <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">{{ 'close'|_ }}</span>
+                    <button type="button" class="close" data-dismiss="alert"><span>&times;</span><span class="sr-only">{{ 'close'|_ }}</span>
                     </button>
                     {{ session('logoutMessage') }}
                 </div>

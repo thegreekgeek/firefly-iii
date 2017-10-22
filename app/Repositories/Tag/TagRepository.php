@@ -1,21 +1,32 @@
 <?php
 /**
  * TagRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Tag;
 
 
 use Carbon\Carbon;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
 use FireflyIII\Models\Tag;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Models\TransactionType;
@@ -35,16 +46,6 @@ class TagRepository implements TagRepositoryInterface
     private $user;
 
     /**
-     * TagRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
-
-    /**
      *
      * @param TransactionJournal $journal
      * @param Tag                $tag
@@ -57,25 +58,23 @@ class TagRepository implements TagRepositoryInterface
          * Already connected:
          */
         if ($journal->tags()->find($tag->id)) {
-            Log::error(sprintf('Cannot find tag #%d', $tag->id));
+            Log::info(sprintf('Tag #%d is already connected to journal #%d.', $tag->id, $journal->id));
 
             return false;
         }
+        Log::debug(sprintf('Tag #%d connected', $tag->id));
+        $journal->tags()->save($tag);
+        $journal->save();
 
-        switch ($tag->tagMode) {
-            case 'nothing':
-                Log::debug(sprintf('Tag #%d connected', $tag->id));
-                $journal->tags()->save($tag);
-                $journal->save();
+        return true;
+    }
 
-                return true;
-            case 'balancingAct':
-                return $this->connectBalancingAct($journal, $tag);
-            case 'advancePayment':
-                return $this->connectAdvancePayment($journal, $tag);
-        }
-
-        return false;
+    /**
+     * @return int
+     */
+    public function count(): int
+    {
+        return $this->user->tags()->count();
     }
 
     /**
@@ -88,6 +87,25 @@ class TagRepository implements TagRepositoryInterface
         $tag->delete();
 
         return true;
+    }
+
+    /**
+     * @param Tag    $tag
+     * @param Carbon $start
+     * @param Carbon $end
+     *
+     * @return string
+     */
+    public function earnedInPeriod(Tag $tag, Carbon $start, Carbon $end): string
+    {
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setUser($this->user);
+        $collector->setRange($start, $end)->setTypes([TransactionType::DEPOSIT])->setAllAssetAccounts()->setTag($tag);
+        $set = $collector->getJournals();
+        $sum = strval($set->sum('transaction_amount'));
+
+        return $sum;
     }
 
     /**
@@ -155,6 +173,16 @@ class TagRepository implements TagRepositoryInterface
     }
 
     /**
+     * @param string $type
+     *
+     * @return Collection
+     */
+    public function getByType(string $type): Collection
+    {
+        return $this->user->tags()->where('tagMode', $type)->orderBy('date', 'ASC')->get();
+    }
+
+    /**
      * @param Tag $tag
      *
      * @return Carbon
@@ -167,6 +195,41 @@ class TagRepository implements TagRepositoryInterface
         }
 
         return new Carbon;
+    }
+
+    /**
+     * @return Tag
+     */
+    public function oldestTag(): ?Tag
+    {
+        return $this->user->tags()->whereNotNull('date')->orderBy('date', 'ASC')->first();
+    }
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
+     * @param Tag    $tag
+     * @param Carbon $start
+     * @param Carbon $end
+     *
+     * @return string
+     */
+    public function spentInPeriod(Tag $tag, Carbon $start, Carbon $end): string
+    {
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setUser($this->user);
+        $collector->setRange($start, $end)->setTypes([TransactionType::WITHDRAWAL])->setAllAssetAccounts()->setTag($tag);
+        $set = $collector->getJournals();
+        $sum = strval($set->sum('transaction_amount'));
+
+        return $sum;
     }
 
     /**
@@ -183,13 +246,131 @@ class TagRepository implements TagRepositoryInterface
         $tag->latitude    = $data['latitude'];
         $tag->longitude   = $data['longitude'];
         $tag->zoomLevel   = $data['zoomLevel'];
-        $tag->tagMode     = $data['tagMode'];
+        $tag->tagMode     = 'nothing';
         $tag->user()->associate($this->user);
         $tag->save();
 
         return $tag;
 
 
+    }
+
+    /**
+     * @param Tag         $tag
+     * @param Carbon|null $start
+     * @param Carbon|null $end
+     *
+     * @return string
+     */
+    public function sumOfTag(Tag $tag, ?Carbon $start, ?Carbon $end): string
+    {
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+
+        if (!is_null($start) && !is_null($end)) {
+            $collector->setRange($start, $end);
+        }
+
+        $collector->setAllAssetAccounts()->setTag($tag);
+        $journals = $collector->getJournals();
+        $sum      = '0';
+        foreach ($journals as $journal) {
+            $sum = bcadd($sum, app('steam')->positive(strval($journal->transaction_amount)));
+        }
+
+        return strval($sum);
+    }
+
+    /**
+     * @param Tag         $tag
+     * @param Carbon|null $start
+     * @param Carbon|null $end
+     *
+     * @return array
+     */
+    public function sumsOfTag(Tag $tag, ?Carbon $start, ?Carbon $end): array
+    {
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+
+        if (!is_null($start) && !is_null($end)) {
+            $collector->setRange($start, $end);
+        }
+
+        $collector->setAllAssetAccounts()->setTag($tag)->withOpposingAccount();
+        $collector->removeFilter(InternalTransferFilter::class);
+        $journals = $collector->getJournals();
+
+        $sums = [
+            TransactionType::WITHDRAWAL => '0',
+            TransactionType::DEPOSIT    => '0',
+            TransactionType::TRANSFER   => '0',
+        ];
+
+        foreach ($journals as $journal) {
+            $amount = app('steam')->positive(strval($journal->transaction_amount));
+            $type   = $journal->transaction_type_type;
+            if ($type === TransactionType::WITHDRAWAL) {
+                $amount = bcmul($amount, '-1');
+            }
+            $sums[$type] = bcadd($sums[$type], $amount);
+        }
+
+        return $sums;
+    }
+
+    /**
+     * Generates a tag cloud.
+     *
+     * @param int|null $year
+     *
+     * @return array
+     */
+    public function tagCloud(?int $year): array
+    {
+        $min    = null;
+        $max    = 0;
+        $query  = $this->user->tags();
+        $return = [];
+        Log::debug('Going to build tag-cloud');
+        if (!is_null($year)) {
+            Log::debug(sprintf('Year is not null: %d', $year));
+            $start = $year . '-01-01';
+            $end   = $year . '-12-31';
+            $query->where('date', '>=', $start)->where('date', '<=', $end);
+        }
+        if (is_null($year)) {
+            $query->whereNull('date');
+            Log::debug('Year is NULL');
+        }
+        $tags      = $query->orderBy('id', 'desc')->get();
+        $temporary = [];
+        Log::debug(sprintf('Found %d tags', $tags->count()));
+        /** @var Tag $tag */
+        foreach ($tags as $tag) {
+            $amount      = floatval($this->sumOfTag($tag, null, null));
+            $min         = $amount < $min || is_null($min) ? $amount : $min;
+            $max         = $amount > $max ? $amount : $max;
+            $temporary[] = [
+                'amount' => $amount,
+                'tag'    => $tag,
+            ];
+            Log::debug(sprintf('Now working on tag %s with total amount %s', $tag->tag, $amount));
+            Log::debug(sprintf('Minimum is now %f, maximum is %f', $min, $max));
+        }
+        /** @var array $entry */
+        foreach ($temporary as $entry) {
+            $scale          = $this->cloudScale([12, 20], $entry['amount'], $min, $max);
+            $tagId          = $entry['tag']->id;
+            $return[$tagId] = [
+                'scale' => $scale,
+                'tag'   => $entry['tag'],
+            ];
+        }
+
+        Log::debug('DONE with tagcloud');
+
+        return $return;
     }
 
     /**
@@ -206,219 +387,43 @@ class TagRepository implements TagRepositoryInterface
         $tag->latitude    = $data['latitude'];
         $tag->longitude   = $data['longitude'];
         $tag->zoomLevel   = $data['zoomLevel'];
-        $tag->tagMode     = $data['tagMode'];
         $tag->save();
 
         return $tag;
     }
 
     /**
-     * @param TransactionJournal $journal
-     * @param Tag                $tag
+     * @param array $range
+     * @param float $amount
+     * @param float $min
+     * @param float $max
      *
-     * @return bool
+     * @return int
      */
-    protected function connectAdvancePayment(TransactionJournal $journal, Tag $tag): bool
+    private function cloudScale(array $range, float $amount, float $min, float $max): int
     {
-        $type        = $journal->transactionType->type;
-        $withdrawals = $tag->transactionJournals()
-                           ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
-                           ->where('transaction_types.type', TransactionType::WITHDRAWAL)->count();
-        $deposits    = $tag->transactionJournals()
-                           ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
-                           ->where('transaction_types.type', TransactionType::DEPOSIT)->count();
+        Log::debug(sprintf('Now in cloudScale with %s as amount and %f min, %f max', $amount, $min, $max));
+        $amountDiff = $max - $min;
+        Log::debug(sprintf('AmountDiff is %f', $amountDiff));
 
-        if ($type === TransactionType::TRANSFER) { // advance payments cannot accept transfers:
-            Log::error(sprintf('Journal #%d is a transfer and cannot connect to tag #%d', $journal->id, $tag->id));
+        // no difference? Every tag same range:
+        if ($amountDiff === 0.0) {
+            Log::debug(sprintf('AmountDiff is zero, return %d', $range[0]));
 
-            return false;
+            return $range[0];
         }
 
-        // the first transaction to be attached to this tag is attached just like that:
-        if ($withdrawals < 1 && $deposits < 1) {
-            Log::debug(sprintf('Tag #%d has 0 withdrawals and 0 deposits so its fine.', $tag->id));
-            $journal->tags()->save($tag);
-            $journal->save();
-
-            return true;
+        $diff = $range[1] - $range[0];
+        $step = 1;
+        if ($diff != 0) {
+            $step = $amountDiff / $diff;
         }
-
-        // if withdrawal and already has a withdrawal, return false:
-        if ($type === TransactionType::WITHDRAWAL && $withdrawals > 0) {
-            Log::error(sprintf('Journal #%d is a withdrawal but tag already has %d withdrawal(s).', $journal->id, $withdrawals));
-
-            return false;
+        if ($step == 0) {
+            $step = 1;
         }
-
-        // if already has transaction journals, must match ALL asset account id's:
-        if ($deposits > 0 || $withdrawals == 1) {
-            Log::debug('Need to match all asset accounts.');
-
-            return $this->matchAll($journal, $tag);
-        }
-
-        // this statement is unreachable.
-        return false;
-
-    }
-
-    /**
-     * @param TransactionJournal $journal
-     * @param Tag                $tag
-     *
-     * @return bool
-     */
-    protected function connectBalancingAct(TransactionJournal $journal, Tag $tag): bool
-    {
-        $type        = $journal->transactionType->type;
-        $withdrawals = $tag->transactionJournals()
-                           ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
-                           ->where('transaction_types.type', TransactionType::WITHDRAWAL)->count();
-        $transfers   = $tag->transactionJournals()
-                           ->leftJoin('transaction_types', 'transaction_types.id', 'transaction_journals.transaction_type_id')
-                           ->where('transaction_types.type', TransactionType::TRANSFER)->count();
+        $extra = round($amount / $step);
 
 
-        Log::debug(sprintf('Journal #%d is a %s', $journal->id, $type));
-
-        // only if this is the only withdrawal.
-        if ($type === TransactionType::WITHDRAWAL && $withdrawals < 1) {
-            Log::debug('Will connect this journal because it is the only withdrawal in this tag.');
-            $journal->tags()->save($tag);
-            $journal->save();
-
-            return true;
-        }
-        // and only if this is the only transfer
-        if ($type === TransactionType::TRANSFER && $transfers < 1) {
-            Log::debug('Will connect this journal because it is the only transfer in this tag.');
-            $journal->tags()->save($tag);
-            $journal->save();
-
-            return true;
-        }
-        Log::error(
-            sprintf(
-                'Tag #%d has %d withdrawals and %d transfers and cannot contain %s #%d',
-                $tag->id, $withdrawals, $transfers, $type, $journal->id
-            )
-        );
-
-        // ignore expense
-        return false;
-
-    }
-
-    /**
-     * The incoming journal ($journal)'s accounts (source accounts for a withdrawal, destination accounts for a deposit)
-     * must match the already existing transaction's accounts exactly.
-     *
-     * @param TransactionJournal $journal
-     * @param Tag                $tag
-     *
-     *
-     * @return bool
-     */
-    private function matchAll(TransactionJournal $journal, Tag $tag): bool
-    {
-        $journalSources      = join(',', array_unique(TransactionJournal::sourceAccountList($journal)->pluck('id')->toArray()));
-        $journalDestinations = join(',', array_unique(TransactionJournal::destinationAccountList($journal)->pluck('id')->toArray()));
-        $match               = true;
-        $journals            = $tag->transactionJournals()->get(['transaction_journals.*']);
-
-        Log::debug(sprintf('Tag #%d has %d journals to verify:', $tag->id, $journals->count()));
-
-        /** @var TransactionJournal $existing */
-        foreach ($journals as $existing) {
-            Log::debug(sprintf('Now existingcomparing new journal #%d to existing journal #%d', $journal->id, $existing->id));
-            // $checkAccount is the source_account for a withdrawal
-            // $checkAccount is the destination_account for a deposit
-            $existingSources      = join(',', array_unique(TransactionJournal::sourceAccountList($existing)->pluck('id')->toArray()));
-            $existingDestinations = join(',', array_unique(TransactionJournal::destinationAccountList($existing)->pluck('id')->toArray()));
-
-            if ($existing->isWithdrawal() && $existingSources !== $journalDestinations) {
-                /*
-                 * There can only be one withdrawal. And the source account(s) of the withdrawal
-                 * must be the same as the destination of the deposit. Because any transaction that arrives
-                 * here ($journal) must be a deposit.
-                 */
-                Log::debug(sprintf('Existing journal #%d is a withdrawal.', $existing->id));
-                Log::debug(sprintf('New journal #%d must have these destination accounts: %s', $journal->id, $existingSources));
-                Log::debug(sprintf('New journal #%d actually these destination accounts: %s', $journal->id, $journalDestinations));
-                Log::debug('So match is FALSE');
-
-                $match = false;
-            }
-            if ($existing->isDeposit() && $journal->isDeposit() && $existingDestinations !== $journalDestinations) {
-                /*
-                 * There can be multiple deposits.
-                 * They must have the destination the same as the other deposits.
-                 */
-                Log::debug(sprintf('Existing journal #%d is a deposit.', $existing->id));
-                Log::debug(sprintf('Journal #%d must have these destination accounts: %s', $journal->id, $existingDestinations));
-                Log::debug(sprintf('Journal #%d actually these destination accounts: %s', $journal->id, $journalDestinations));
-                Log::debug('So match is FALSE');
-
-                $match = false;
-            }
-
-            if ($existing->isDeposit() && $journal->isWithdrawal() && $existingDestinations !== $journalSources) {
-                /*
-                 * There can be one new withdrawal only. It must have the same source as the existing has destination.
-                 */
-                Log::debug(sprintf('Existing journal #%d is a deposit.', $existing->id));
-                Log::debug(sprintf('Journal #%d must have these source accounts: %s', $journal->id, $existingDestinations));
-                Log::debug(sprintf('Journal #%d actually these source accounts: %s', $journal->id, $journalSources));
-                Log::debug('So match is FALSE');
-
-                $match = false;
-            }
-
-        }
-        if ($match) {
-            Log::debug(sprintf('Match is true, connect journal #%d with tag #%d.', $journal->id, $tag->id));
-            $journal->tags()->save($tag);
-            $journal->save();
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param Tag    $tag
-     * @param Carbon $start
-     * @param Carbon $end
-     *
-     * @return string
-     */
-    public function earnedInPeriod(Tag $tag, Carbon $start, Carbon $end): string
-    {
-        /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [$this->user]);
-        $collector->setRange($start, $end)->setTypes([TransactionType::DEPOSIT])->setAllAssetAccounts()->setTag($tag);
-        $set = $collector->getJournals();
-        $sum = strval($set->sum('transaction_amount'));
-
-        return $sum;
-    }
-
-    /**
-     * @param Tag    $tag
-     * @param Carbon $start
-     * @param Carbon $end
-     *
-     * @return string
-     */
-    public function spentInPeriod(Tag $tag, Carbon $start, Carbon $end): string
-    {
-        /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [$this->user]);
-        $collector->setRange($start, $end)->setTypes([TransactionType::WITHDRAWAL])->setAllAssetAccounts()->setTag($tag);
-        $set = $collector->getJournals();
-        $sum = strval($set->sum('transaction_amount'));
-
-        return $sum;
+        return intval($range[0] + $extra);
     }
 }

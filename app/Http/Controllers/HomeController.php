@@ -1,15 +1,26 @@
 <?php
 /**
  * HomeController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Http\Controllers;
 
 use Artisan;
@@ -17,15 +28,14 @@ use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
 use FireflyIII\Models\AccountType;
-use FireflyIII\Models\Tag;
-use FireflyIII\Repositories\Account\AccountRepositoryInterface as ARI;
+use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\Repositories\Bill\BillRepositoryInterface;
-use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Collection;
 use Log;
 use Preferences;
-use Route;
+use Route as RouteFacade;
 use Session;
 use View;
 
@@ -82,50 +92,42 @@ class HomeController extends Controller
      */
     public function displayError()
     {
+        Log::debug('This is a test message at the DEBUG level.');
+        Log::info('This is a test message at the INFO level.');
+        Log::notice('This is a test message at the NOTICE level.');
+        Log::warning('This is a test message at the WARNING level.');
+        Log::error('This is a test message at the ERROR level.');
+        Log::critical('This is a test message at the CRITICAL level.');
+        Log::alert('This is a test message at the ALERT level.');
+        Log::emergency('This is a test message at the EMERGENCY level.');
         throw new FireflyException('A very simple test error.');
     }
 
     /**
-     * @param TagRepositoryInterface $repository
+     * @param Request $request
      *
      * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector
      */
-    public function flush(TagRepositoryInterface $repository)
+    public function flush(Request $request)
     {
-
         Preferences::mark();
-
-        // get all tags.
-        // update all counts:
-        $tags = $repository->get();
-
-        /** @var Tag $tag */
-        foreach ($tags as $tag) {
-            foreach ($tag->transactionJournals()->get() as $journal) {
-                $count              = $journal->tags()->count();
-                $journal->tag_count = $count;
-                $journal->save();
-            }
-        }
-        Session::forget(['start', 'end', 'viewRange', 'range', 'is_custom_range']);
-
-        Session::clear();
+        $request->session()->forget(['start', 'end', '_previous', 'viewRange', 'range', 'is_custom_range']);
         Artisan::call('cache:clear');
 
         return redirect(route('index'));
     }
 
     /**
-     * @param ARI $repository
+     * @param AccountRepositoryInterface $repository
      *
      * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|View
      */
-    public function index(ARI $repository)
+    public function index(AccountRepositoryInterface $repository)
     {
         $types = config('firefly.accountTypesByIdentifier.asset');
         $count = $repository->count($types);
 
-        if ($count == 0) {
+        if ($count === 0) {
             return redirect(route('new-user.index'));
         }
 
@@ -137,15 +139,15 @@ class HomeController extends Controller
         /** @var Carbon $start */
         $start = session('start', Carbon::now()->startOfMonth());
         /** @var Carbon $end */
-        $end                   = session('end', Carbon::now()->endOfMonth());
-        $showTour              = Preferences::get('tour', true)->data;
-        $accounts              = $repository->getAccountsById($frontPage->data);
-        $showDepositsFrontpage = Preferences::get('showDepositsFrontpage', false)->data;
+        $end      = session('end', Carbon::now()->endOfMonth());
+        $accounts = $repository->getAccountsById($frontPage->data);
+        $showDeps = Preferences::get('showDepositsFrontpage', false)->data;
 
         // zero bills? Hide some elements from view.
         /** @var BillRepositoryInterface $billRepository */
         $billRepository = app(BillRepositoryInterface::class);
         $billCount      = $billRepository->getBills()->count();
+
 
         foreach ($accounts as $account) {
             $collector = app(JournalCollectorInterface::class);
@@ -155,76 +157,40 @@ class HomeController extends Controller
         }
 
         return view(
-            'index', compact('count', 'showTour', 'title', 'subTitle', 'mainTitleIcon', 'transactions', 'showDepositsFrontpage', 'billCount')
+            'index', compact('count', 'subTitle', 'transactions', 'showDeps','billCount')
         );
     }
 
-    /**
-     * Display a list of named routes. Excludes some that cannot be "shown". This method
-     * is used to generate help files (down the road).
-     */
     public function routes()
     {
-        // these routes are not relevant for the help pages:
-        $ignore = [
-            // login and two-factor routes:
-            'login',
-            'registe',
-            'password.rese',
-            'logout',
-            'two-fac',
-            'lost-two',
-            // test troutes
-            'test-flash',
-            'all-routes',
-            // json routes
-            'json.',
-            // routes that point to modals or that redirect immediately.
-            'piggy-banks.add',
-            'piggy-banks.remove',
-            'rules.rule.up',
-            'attachments.download',
-            'bills.rescan',
-            'rules.rule.down',
-            'rules.rule-group.up',
-            'rules.rule-group.down',
-            'popup.',
-            'error',
-            'flush',
-            //'preferences.',
-            'admin.users.domains.block-',
-            'help.',
-            // ajax routes:
-            'import.json',
-            // charts:
-            'chart.',
-            // report data:
-            'report-data.',
-
-            // others:
-            'debugbar',
-            'attachments.preview',
-            'budgets.income',
-            'currencies.default',
-
+        $set    = RouteFacade::getRoutes();
+        $ignore = ['chart.', 'javascript.', 'json.', 'report-data.', 'popup.', 'debugbar.', 'attachments.download', 'attachments.preview',
+                   'bills.rescan', 'budgets.income', 'currencies.def', 'error', 'flush', 'help.show', 'import.file',
+                   'login', 'logout', 'password.reset', 'profile.confirm-email-change', 'profile.undo-email-change',
+                   'register', 'report.options', 'routes', 'rule-groups.down', 'rule-groups.up', 'rules.up', 'rules.down',
+                   'rules.select', 'search.search', 'test-flash', 'transactions.link.delete', 'transactions.link.switch',
+                   'two-factor.lost', 'report.options',
 
         ];
-        $routes = Route::getRoutes();
-        $return = '<pre>';
 
-        /** @var \Illuminate\Routing\Route $route */
-        foreach ($routes as $route) {
-            $name    = $route->getName();
-            $methods = $route->getMethods();
-
-            if (!is_null($name) && strlen($name) > 0 && in_array('GET', $methods) && !$this->startsWithAny($ignore, $name)) {
-                $return .= sprintf('touch %s.md', $name) . "\n";
+        /** @var Route $route */
+        foreach ($set as $route) {
+            $name = $route->getName();
+            if (!is_null($name) && in_array('GET', $route->methods()) && strlen($name) > 0) {
+                $found = false;
+                foreach ($ignore as $string) {
+                    if (strpos($name, $string) !== false) {
+                        $found = true;
+                    }
+                }
+                if (!$found) {
+                    echo 'touch ' . $route->getName() . '.md;';
+                }
 
             }
         }
-        $return .= '</pre><hr />';
 
-        return $return;
+        return '&nbsp;';
     }
 
     /**
@@ -238,23 +204,6 @@ class HomeController extends Controller
         Session::flash('error', 'This is an error!');
 
         return redirect(route('home'));
-    }
-
-    /**
-     * @param array  $array
-     * @param string $needle
-     *
-     * @return bool
-     */
-    private function startsWithAny(array $array, string $needle): bool
-    {
-        foreach ($array as $entry) {
-            if ((substr($needle, 0, strlen($entry)) === $entry)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
 }

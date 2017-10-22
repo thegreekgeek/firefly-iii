@@ -1,26 +1,41 @@
 <?php
 /**
  * VerifyCsrfToken.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
+ * This file is part of Firefly III.
+ *
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+declare(strict_types=1);
+
+
+/**
+ * VerifyCsrfToken.php
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  * This software may be modified and distributed under the terms of the
  * Creative Commons Attribution-ShareAlike 4.0 International License.
  *
  * See the LICENSE file for details.
  */
-declare(strict_types = 1);
 
 namespace FireflyIII\Http\Middleware;
 
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as BaseVerifier;
-use Symfony\Component\HttpFoundation\Cookie;
-use Carbon\Carbon;
-/**
- * Class VerifyCsrfToken
- *
- * @package FireflyIII\Http\Middleware
- */
-class VerifyCsrfToken extends BaseVerifier
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+
+class VerifyCsrfToken extends Middleware
 {
     /**
      * The URIs that should be excluded from CSRF verification.
@@ -31,25 +46,4 @@ class VerifyCsrfToken extends BaseVerifier
         = [
             //
         ];
-
-    /**
-     * Add the CSRF token to the response cookies.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Symfony\Component\HttpFoundation\Response  $response
-     * @return \Symfony\Component\HttpFoundation\Response
-     */
-    protected function addCookieToResponse($request, $response)
-    {
-        $config = config('session');
-
-        $response->headers->setCookie(
-            new Cookie(
-                'XSRF-TOKEN', $request->session()->token(), Carbon::now()->getTimestamp() + 60 * $config['lifetime'],
-                $config['path'], $config['domain'], $config['secure'], true
-            )
-        );
-
-        return $response;
-    }
 }

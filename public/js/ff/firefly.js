@@ -1,17 +1,34 @@
 /*
  * firefly.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
-/** global: moment, accountingConfig, dateRangeConfig, accounting, currencySymbol, mon_decimal_point, frac_digits, showFullList, showOnlyTop, mon_thousands_sep */
+/** global: moment, dateRangeMeta,dateRangeConfig, accountingConfig, accounting, currencySymbol, mon_decimal_point, frac_digits, showFullList, showOnlyTop, mon_thousands_sep */
 
 
 $(function () {
     "use strict";
+
+    configAccounting(currencySymbol);
+
+    // on submit of form, disable any button in form:
+    $('form.form-horizontal').on('submit', function () {
+        $('button[type="submit"]').prop('disabled', true);
+    });
 
     $.ajaxSetup({
                     headers: {
@@ -20,29 +37,20 @@ $(function () {
                 });
 
     // when you click on a currency, this happens:
-    $('.currency-option').click(currencySelect);
-
-    var ranges = {};
-    ranges[dateRangeConfig.currentPeriod] = [moment(dateRangeConfig.ranges.current[0]), moment(dateRangeConfig.ranges.current[1])];
-    ranges[dateRangeConfig.previousPeriod] = [moment(dateRangeConfig.ranges.previous[0]), moment(dateRangeConfig.ranges.previous[1])];
-    ranges[dateRangeConfig.nextPeriod] = [moment(dateRangeConfig.ranges.next[0]), moment(dateRangeConfig.ranges.next[1])];
-
-    // range for everything:
-    ranges[dateRangeConfig.everything] = [dateRangeConfig.firstDate, moment()];
-
+    $('.currency-option').on('click', currencySelect);
 
     // build the data range:
-    $('#daterange').text(dateRangeConfig.linkTitle).daterangepicker(
+    $('#daterange').text(dateRangeMeta.title).daterangepicker(
         {
-            ranges: ranges,
+            ranges: dateRangeConfig.ranges,
             opens: 'left',
             locale: {
-                applyLabel: dateRangeConfig.applyLabel,
-                cancelLabel: dateRangeConfig.cancelLabel,
-                fromLabel: dateRangeConfig.fromLabel,
-                toLabel: dateRangeConfig.toLabel,
+                applyLabel: dateRangeMeta.labels.apply,
+                cancelLabel: dateRangeMeta.labels.cancel,
+                fromLabel: dateRangeMeta.labels.from,
+                toLabel: dateRangeMeta.labels.to,
                 weekLabel: 'W',
-                customRangeLabel: dateRangeConfig.customRangeLabel,
+                customRangeLabel: dateRangeMeta.labels.customRange,
                 daysOfWeek: moment.weekdaysMin(),
                 monthNames: moment.monthsShort(),
                 firstDay: moment.localeData()._week.dow
@@ -54,7 +62,7 @@ $(function () {
         function (start, end, label) {
 
             // send post.
-            $.post(dateRangeConfig.URL, {
+            $.post(dateRangeMeta.uri, {
                 start: start.format('YYYY-MM-DD'),
                 end: end.format('YYYY-MM-DD'),
                 label: label
@@ -102,28 +110,30 @@ function currencySelect(e) {
     $('#' + spanId).text(symbol);
 
     // close the menu (hack hack)
-    $('#' + menuID).click();
+    $('#' + menuID).dropdown('toggle');
 
 
     return false;
 }
 
-// Settings object that controls default parameters for library methods:
-accounting.settings = {
-    currency: {
-        symbol: currencySymbol,   // default currency symbol is '$'
-        format: accountingConfig, // controls output: %s = symbol, %v = value/number (can be object: see below)
-        decimal: mon_decimal_point,  // decimal point separator
-        thousand: mon_thousands_sep,  // thousands separator
-        precision: frac_digits   // decimal places
-    },
-    number: {
-        precision: 0,  // default precision on numbers is 0
-        thousand: ",",
-        decimal: "."
-    }
-};
+function configAccounting(customCurrency) {
 
+// Settings object that controls default parameters for library methods:
+    accounting.settings = {
+        currency: {
+            symbol: customCurrency,   // default currency symbol is '$'
+            format: accountingConfig, // controls output: %s = symbol, %v = value/number (can be object: see below)
+            decimal: mon_decimal_point,  // decimal point separator
+            thousand: mon_thousands_sep,  // thousands separator
+            precision: frac_digits   // decimal places
+        },
+        number: {
+            precision: 0,  // default precision on numbers is 0
+            thousand: ",",
+            decimal: "."
+        }
+    };
+}
 
 function listLengthInitial() {
     "use strict";

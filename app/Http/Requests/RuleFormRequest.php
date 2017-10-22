@@ -1,19 +1,29 @@
 <?php
 /**
  * RuleFormRequest.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Requests;
 
-use FireflyIII\Repositories\RuleGroup\RuleGroupRepositoryInterface;
+use FireflyIII\Repositories\Rule\RuleRepositoryInterface;
 
 /**
  * Class RuleFormRequest
@@ -39,6 +49,7 @@ class RuleFormRequest extends Request
     {
         return [
             'title'               => $this->string('title'),
+            'rule_group_id'       => $this->integer('rule_group_id'),
             'active'              => $this->boolean('active'),
             'trigger'             => $this->string('trigger'),
             'description'         => $this->string('description'),
@@ -57,22 +68,21 @@ class RuleFormRequest extends Request
      */
     public function rules()
     {
-        /** @var RuleGroupRepositoryInterface $repository */
-        $repository    = app(RuleGroupRepositoryInterface::class);
+        /** @var RuleRepositoryInterface $repository */
+        $repository    = app(RuleRepositoryInterface::class);
         $validTriggers = array_keys(config('firefly.rule-triggers'));
         $validActions  = array_keys(config('firefly.rule-actions'));
 
         // some actions require text:
         $contextActions = join(',', config('firefly.rule-actions-text'));
 
-        $titleRule = 'required|between:1,100|uniqueObjectForUser:rule_groups,title';
+        $titleRule = 'required|between:1,100|uniqueObjectForUser:rules,title';
         if (!is_null($repository->find(intval($this->get('id')))->id)) {
-            $titleRule = 'required|between:1,100|uniqueObjectForUser:rule_groups,title,' . intval($this->get('id'));
+            $titleRule = 'required|between:1,100|uniqueObjectForUser:rules,title,' . intval($this->get('id'));
         }
-
         $rules = [
             'title'                => $titleRule,
-            'description'          => 'between:1,5000',
+            'description'          => 'between:1,5000|nullable',
             'stop_processing'      => 'boolean',
             'rule_group_id'        => 'required|belongsToUser:rule_groups',
             'trigger'              => 'required|in:store-journal,update-journal',

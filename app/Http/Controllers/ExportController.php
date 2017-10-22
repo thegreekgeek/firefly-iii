@@ -1,15 +1,25 @@
 <?php
 /**
  * ExportController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 namespace FireflyIII\Http\Controllers;
@@ -23,7 +33,6 @@ use FireflyIII\Models\AccountType;
 use FireflyIII\Models\ExportJob;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\Repositories\ExportJob\ExportJobRepositoryInterface;
-use FireflyIII\Repositories\ExportJob\ExportJobRepositoryInterface as EJRI;
 use Illuminate\Http\Response as LaravelResponse;
 use Preferences;
 use Response;
@@ -47,7 +56,7 @@ class ExportController extends Controller
         $this->middleware(
             function ($request, $next) {
                 View::share('mainTitleIcon', 'fa-file-archive-o');
-                View::share('title', trans('firefly.export_data'));
+                View::share('title', trans('firefly.export_and_backup_data'));
 
                 return $next($request);
             }
@@ -55,9 +64,10 @@ class ExportController extends Controller
     }
 
     /**
-     * @param ExportJob $job
+     * @param ExportJobRepositoryInterface $repository
+     * @param ExportJob                    $job
      *
-     * @return \Symfony\Component\HttpFoundation\Response|\Illuminate\Contracts\Routing\ResponseFactory
+     * @return \Illuminate\Contracts\Routing\ResponseFactory|\Symfony\Component\HttpFoundation\Response
      * @throws FireflyException
      */
     public function download(ExportJobRepositoryInterface $repository, ExportJob $job)
@@ -102,12 +112,12 @@ class ExportController extends Controller
     }
 
     /**
-     * @param AccountRepositoryInterface $repository
-     * @param EJRI                       $jobs
+     * @param AccountRepositoryInterface   $repository
+     * @param ExportJobRepositoryInterface $jobs
      *
      * @return View
      */
-    public function index(AccountRepositoryInterface $repository, EJRI $jobs)
+    public function index(AccountRepositoryInterface $repository, ExportJobRepositoryInterface $jobs)
     {
         // create new export job.
         $job = $jobs->create();
@@ -128,29 +138,31 @@ class ExportController extends Controller
     }
 
     /**
-     * @param ExportFormRequest          $request
-     * @param AccountRepositoryInterface $repository
-     * @param EJRI                       $jobs
+     * @param ExportFormRequest            $request
+     * @param AccountRepositoryInterface   $repository
+     * @param ExportJobRepositoryInterface $jobs
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function postIndex(ExportFormRequest $request, AccountRepositoryInterface $repository, EJRI $jobs)
+    public function postIndex(ExportFormRequest $request, AccountRepositoryInterface $repository, ExportJobRepositoryInterface $jobs)
     {
         $job      = $jobs->findByKey($request->get('job'));
+        $accounts = $request->get('accounts') ?? [];
         $settings = [
-            'accounts'           => $repository->getAccountsById($request->get('accounts')),
+            'accounts'           => $repository->getAccountsById($accounts),
             'startDate'          => new Carbon($request->get('export_start_range')),
             'endDate'            => new Carbon($request->get('export_end_range')),
             'exportFormat'       => $request->get('exportFormat'),
-            'includeAttachments' => intval($request->get('include_attachments')) === 1,
-            'includeOldUploads'  => intval($request->get('include_old_uploads')) === 1,
+            'includeAttachments' => $request->boolean('include_attachments'),
+            'includeOldUploads'  => $request->boolean('include_old_uploads'),
             'job'                => $job,
         ];
 
         $jobs->changeStatus($job, 'export_status_make_exporter');
 
         /** @var ProcessorInterface $processor */
-        $processor = app(ProcessorInterface::class, [$settings]);
+        $processor = app(ProcessorInterface::class);
+        $processor->setSettings($settings);
 
         /*
          * Collect journals:
@@ -158,12 +170,14 @@ class ExportController extends Controller
         $jobs->changeStatus($job, 'export_status_collecting_journals');
         $processor->collectJournals();
         $jobs->changeStatus($job, 'export_status_collected_journals');
+
         /*
          * Transform to exportable entries:
          */
         $jobs->changeStatus($job, 'export_status_converting_to_export_format');
         $processor->convertJournals();
         $jobs->changeStatus($job, 'export_status_converted_to_export_format');
+
         /*
          * Transform to (temporary) file:
          */
@@ -178,6 +192,7 @@ class ExportController extends Controller
             $processor->collectAttachments();
             $jobs->changeStatus($job, 'export_status_collected_attachments');
         }
+
 
         /*
          * Collect old uploads

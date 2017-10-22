@@ -1,15 +1,25 @@
 <?php
 /**
  * CategoryController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Report;
 
@@ -20,7 +30,6 @@ use FireflyIII\Models\Category;
 use FireflyIII\Repositories\Category\CategoryRepositoryInterface;
 use FireflyIII\Support\CacheProperties;
 use Illuminate\Support\Collection;
-use Log;
 use Navigation;
 
 /**
@@ -45,9 +54,7 @@ class CategoryController extends Controller
         $cache->addProperty('category-period-expenses-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            Log::debug('Return report from cache');
-
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         /** @var CategoryRepositoryInterface $repository */
         $repository = app(CategoryRepositoryInterface::class);
@@ -79,9 +86,7 @@ class CategoryController extends Controller
         $cache->addProperty('category-period-income-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            Log::debug('Return report from cache');
-
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         /** @var CategoryRepositoryInterface $repository */
         $repository = app(CategoryRepositoryInterface::class);
@@ -114,7 +119,7 @@ class CategoryController extends Controller
         $cache->addProperty('category-report');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
 
         /** @var CategoryRepositoryInterface $repository */
@@ -125,7 +130,7 @@ class CategoryController extends Controller
         foreach ($categories as $category) {
             $spent = $repository->spentInPeriod(new Collection([$category]), $accounts, $start, $end);
             if (bccomp($spent, '0') !== 0) {
-                $report[$category->id] = ['name' => $category->name, 'spent' => $spent];
+                $report[$category->id] = ['name' => $category->name, 'spent' => $spent, 'id' => $category->id];
             }
         }
 

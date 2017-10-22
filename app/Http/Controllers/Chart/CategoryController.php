@@ -1,15 +1,25 @@
 <?php
 /**
  * CategoryController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Chart;
 
@@ -20,7 +30,7 @@ use FireflyIII\Http\Controllers\Controller;
 use FireflyIII\Models\AccountType;
 use FireflyIII\Models\Category;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
-use FireflyIII\Repositories\Category\CategoryRepositoryInterface as CRI;
+use FireflyIII\Repositories\Category\CategoryRepositoryInterface;
 use FireflyIII\Support\CacheProperties;
 use Illuminate\Support\Collection;
 use Navigation;
@@ -50,24 +60,24 @@ class CategoryController extends Controller
     /**
      * Show an overview for a category for all time, per month/week/year.
      *
-     * @param CRI                        $repository
-     * @param AccountRepositoryInterface $accountRepository
-     * @param Category                   $category
+     * @param CategoryRepositoryInterface $repository
+     * @param AccountRepositoryInterface  $accountRepository
+     * @param Category                    $category
      *
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function all(CRI $repository, AccountRepositoryInterface $accountRepository, Category $category)
+    public function all(CategoryRepositoryInterface $repository, AccountRepositoryInterface $accountRepository, Category $category)
     {
         $cache = new CacheProperties;
         $cache->addProperty('chart.category.all');
         $cache->addProperty($category->id);
         if ($cache->has()) {
-            return Response::json($cache->get());
+            return Response::json($cache->get()); // @codeCoverageIgnore
         }
 
         $start = $repository->firstUseDate($category);
 
-        if ($start->year == 1900) {
+        if (is_null($start)) {
             $start = new Carbon;
         }
 
@@ -86,15 +96,23 @@ class CategoryController extends Controller
                 'entries' => [],
                 'type'    => 'bar',
             ],
+            [
+                'label'   => strval(trans('firefly.sum')),
+                'entries' => [],
+                'type'    => 'line',
+                'fill'    => false,
+            ],
         ];
 
         while ($start <= $end) {
             $currentEnd                      = Navigation::endOfPeriod($start, $range);
             $spent                           = $repository->spentInPeriod(new Collection([$category]), $accounts, $start, $currentEnd);
             $earned                          = $repository->earnedInPeriod(new Collection([$category]), $accounts, $start, $currentEnd);
+            $sum                             = bcadd($spent, $earned);
             $label                           = Navigation::periodShow($start, $range);
-            $chartData[0]['entries'][$label] = bcmul($spent, '-1');
-            $chartData[1]['entries'][$label] = $earned;
+            $chartData[0]['entries'][$label] = round(bcmul($spent, '-1'), 12);
+            $chartData[1]['entries'][$label] = round($earned, 12);
+            $chartData[2]['entries'][$label] = round($sum, 12);
             $start                           = Navigation::addPeriod($start, $range, 0);
         }
 
@@ -106,27 +124,12 @@ class CategoryController extends Controller
     }
 
     /**
-     * @param CRI      $repository
-     * @param Category $category
-     *
-     * @return \Symfony\Component\HttpFoundation\Response
-     */
-    public function currentPeriod(CRI $repository, Category $category)
-    {
-        $start = clone session('start', Carbon::now()->startOfMonth());
-        $end   = session('end', Carbon::now()->endOfMonth());
-        $data  = $this->makePeriodChart($repository, $category, $start, $end);
-
-        return Response::json($data);
-    }
-
-    /**
-     * @param CRI                        $repository
-     * @param AccountRepositoryInterface $accountRepository
+     * @param CategoryRepositoryInterface $repository
+     * @param AccountRepositoryInterface  $accountRepository
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function frontpage(CRI $repository, AccountRepositoryInterface $accountRepository)
+    public function frontpage(CategoryRepositoryInterface $repository, AccountRepositoryInterface $accountRepository)
     {
         $start = session('start', Carbon::now()->startOfMonth());
         $end   = session('end', Carbon::now()->endOfMonth());
@@ -136,7 +139,7 @@ class CategoryController extends Controller
         $cache->addProperty($end);
         $cache->addProperty('chart.category.frontpage');
         if ($cache->has()) {
-            return Response::json($cache->get());
+            return Response::json($cache->get()); // @codeCoverageIgnore
         }
         $chartData  = [];
         $categories = $repository->getCategories();
@@ -161,15 +164,15 @@ class CategoryController extends Controller
     }
 
     /**
-     * @param CRI        $repository
-     * @param Category   $category
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
+     * @param CategoryRepositoryInterface $repository
+     * @param Category                    $category
+     * @param Collection                  $accounts
+     * @param Carbon                      $start
+     * @param Carbon                      $end
      *
      * @return \Illuminate\Http\JsonResponse|mixed
      */
-    public function reportPeriod(CRI $repository, Category $category, Collection $accounts, Carbon $start, Carbon $end)
+    public function reportPeriod(CategoryRepositoryInterface $repository, Category $category, Collection $accounts, Carbon $start, Carbon $end)
     {
         $cache = new CacheProperties;
         $cache->addProperty($start);
@@ -178,7 +181,7 @@ class CategoryController extends Controller
         $cache->addProperty($accounts->pluck('id')->toArray());
         $cache->addProperty($category);
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         $expenses  = $repository->periodExpenses(new Collection([$category]), $accounts, $start, $end);
         $income    = $repository->periodIncome(new Collection([$category]), $accounts, $start, $end);
@@ -194,13 +197,22 @@ class CategoryController extends Controller
                 'entries' => [],
                 'type'    => 'bar',
             ],
+            [
+                'label'   => strval(trans('firefly.sum')),
+                'entries' => [],
+                'type'    => 'line',
+                'fill'    => false,
+            ],
         ];
 
         foreach (array_keys($periods) as $period) {
             $label                           = $periods[$period];
             $spent                           = $expenses[$category->id]['entries'][$period] ?? '0';
-            $chartData[0]['entries'][$label] = bcmul($spent, '-1');
-            $chartData[1]['entries'][$label] = $income[$category->id]['entries'][$period] ?? '0';
+            $earned                          = $income[$category->id]['entries'][$period] ?? '0';
+            $sum                             = bcadd($spent, $earned);
+            $chartData[0]['entries'][$label] = round(bcmul($spent, '-1'), 12);
+            $chartData[1]['entries'][$label] = round($earned, 12);
+            $chartData[2]['entries'][$label] = round($sum, 12);
         }
 
         $data = $this->generator->multiSet($chartData);
@@ -210,14 +222,14 @@ class CategoryController extends Controller
     }
 
     /**
-     * @param CRI        $repository
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
+     * @param CategoryRepositoryInterface $repository
+     * @param Collection                  $accounts
+     * @param Carbon                      $start
+     * @param Carbon                      $end
      *
      * @return \Illuminate\Http\JsonResponse|mixed
      */
-    public function reportPeriodNoCategory(CRI $repository, Collection $accounts, Carbon $start, Carbon $end)
+    public function reportPeriodNoCategory(CategoryRepositoryInterface $repository, Collection $accounts, Carbon $start, Carbon $end)
     {
         $cache = new CacheProperties;
         $cache->addProperty($start);
@@ -225,7 +237,7 @@ class CategoryController extends Controller
         $cache->addProperty('chart.category.period.no-cat');
         $cache->addProperty($accounts->pluck('id')->toArray());
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         $expenses  = $repository->periodExpensesNoCategory($accounts, $start, $end);
         $income    = $repository->periodIncomeNoCategory($accounts, $start, $end);
@@ -241,13 +253,22 @@ class CategoryController extends Controller
                 'entries' => [],
                 'type'    => 'bar',
             ],
+            [
+                'label'   => strval(trans('firefly.sum')),
+                'entries' => [],
+                'type'    => 'line',
+                'fill'    => false,
+            ],
         ];
 
         foreach (array_keys($periods) as $period) {
             $label                           = $periods[$period];
             $spent                           = $expenses['entries'][$period] ?? '0';
+            $earned                          = $income['entries'][$period] ?? '0';
+            $sum                             = bcadd($spent, $earned);
             $chartData[0]['entries'][$label] = bcmul($spent, '-1');
-            $chartData[1]['entries'][$label] = $income['entries'][$period] ?? '0';
+            $chartData[1]['entries'][$label] = $earned;
+            $chartData[2]['entries'][$label] = $sum;
 
         }
         $data = $this->generator->multiSet($chartData);
@@ -257,34 +278,33 @@ class CategoryController extends Controller
     }
 
     /**
-     * @param CRI                         $repository
+     * @param CategoryRepositoryInterface $repository
      * @param Category                    $category
      *
      * @param                             $date
      *
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function specificPeriod(CRI $repository, Category $category, $date)
+    public function specificPeriod(CategoryRepositoryInterface $repository, Category $category, Carbon $date)
     {
-        $carbon = new Carbon($date);
-        $range  = Preferences::get('viewRange', '1M')->data;
-        $start  = Navigation::startOfPeriod($carbon, $range);
-        $end    = Navigation::endOfPeriod($carbon, $range);
-        $data   = $this->makePeriodChart($repository, $category, $start, $end);
+        $range = Preferences::get('viewRange', '1M')->data;
+        $start = Navigation::startOfPeriod($date, $range);
+        $end   = Navigation::endOfPeriod($date, $range);
+        $data  = $this->makePeriodChart($repository, $category, $start, $end);
 
         return Response::json($data);
     }
 
 
     /**
-     * @param CRI      $repository
-     * @param Category $category
-     * @param Carbon   $start
-     * @param Carbon   $end
+     * @param CategoryRepositoryInterface $repository
+     * @param Category                    $category
+     * @param Carbon                      $start
+     * @param Carbon                      $end
      *
      * @return array
      */
-    private function makePeriodChart(CRI $repository, Category $category, Carbon $start, Carbon $end)
+    private function makePeriodChart(CategoryRepositoryInterface $repository, Category $category, Carbon $start, Carbon $end)
     {
         $cache = new CacheProperties;
         $cache->addProperty($start);
@@ -297,7 +317,7 @@ class CategoryController extends Controller
         $accounts          = $accountRepository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET]);
 
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
 
         // chart data
@@ -312,15 +332,23 @@ class CategoryController extends Controller
                 'entries' => [],
                 'type'    => 'bar',
             ],
+            [
+                'label'   => strval(trans('firefly.sum')),
+                'entries' => [],
+                'type'    => 'line',
+                'fill'    => false,
+            ],
         ];
 
         while ($start <= $end) {
             $spent  = $repository->spentInPeriod(new Collection([$category]), $accounts, $start, $start);
             $earned = $repository->earnedInPeriod(new Collection([$category]), $accounts, $start, $start);
-            $label  = Navigation::periodShow($start, '1D');
+            $sum    = bcadd($spent, $earned);
+            $label  = trim(Navigation::periodShow($start, '1D'));
 
-            $chartData[0]['entries'][$label] = bcmul($spent, '-1');
-            $chartData[1]['entries'][$label] = $earned;
+            $chartData[0]['entries'][$label] = round(bcmul($spent, '-1'), 12);
+            $chartData[1]['entries'][$label] = round($earned, 12);
+            $chartData[2]['entries'][$label] = round($sum, 12);
 
 
             $start->addDay();

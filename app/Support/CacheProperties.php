@@ -1,24 +1,31 @@
 <?php
 /**
  * CacheProperties.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support;
 
 
 use Cache;
-use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
-use Log;
 use Preferences as Prefs;
 
 /**
@@ -75,7 +82,7 @@ class CacheProperties
      */
     public function has(): bool
     {
-        if (getenv('APP_ENV') == 'testing') {
+        if (getenv('APP_ENV') === 'testing') {
             return false;
         }
         $this->md5();
@@ -98,29 +105,8 @@ class CacheProperties
     {
         $this->md5 = '';
         foreach ($this->properties as $property) {
-
-            if ($property instanceof Collection || $property instanceof EloquentCollection) {
-                $this->md5 .= json_encode($property->toArray());
-                continue;
-            }
-            if ($property instanceof Carbon) {
-                $this->md5 .= $property->toRfc3339String();
-                continue;
-            }
-            if (is_object($property)) {
-                $this->md5 .= $property->__toString();
-            }
-            if (is_bool($property) && $property === false) {
-                $this->md5 .= 'false';
-            }
-            if (is_bool($property) && $property === true) {
-                $this->md5 .= 'true';
-            }
-
             $this->md5 .= json_encode($property);
         }
-        Log::debug(sprintf('Cache string is %s', $this->md5));
         $this->md5 = md5($this->md5);
-        Log::debug(sprintf('Cache MD5 is    %s', $this->md5));
     }
 }

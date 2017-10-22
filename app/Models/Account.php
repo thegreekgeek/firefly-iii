@@ -1,15 +1,25 @@
 <?php
 /**
  * Account.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
@@ -95,7 +105,7 @@ class Account extends Model
 
         /** @var Account $account */
         foreach ($set as $account) {
-            if ($account->name == $fields['name']) {
+            if ($account->name === $fields['name']) {
                 return $account;
             }
         }
@@ -116,7 +126,7 @@ class Account extends Model
     {
 
         if (auth()->check()) {
-            if ($value->user_id == auth()->user()->id) {
+            if (intval($value->user_id) === auth()->user()->id) {
                 return $value;
             }
         }
@@ -187,7 +197,7 @@ class Account extends Model
     public function getMeta(string $fieldName): string
     {
         foreach ($this->accountMeta as $meta) {
-            if ($meta->name == $fieldName) {
+            if ($meta->name === $fieldName) {
                 return strval($meta->data);
             }
         }
@@ -209,6 +219,26 @@ class Account extends Model
         }
 
         return $value;
+    }
+
+    /**
+     * Returns the opening balance
+     *
+     * @return TransactionJournal
+     * @throws FireflyException
+     */
+    public function getOpeningBalance(): TransactionJournal
+    {
+        $journal = TransactionJournal::sortCorrectly()
+                                     ->leftJoin('transactions', 'transactions.transaction_journal_id', '=', 'transaction_journals.id')
+                                     ->where('transactions.account_id', $this->id)
+                                     ->transactionTypes([TransactionType::OPENING_BALANCE])
+                                     ->first(['transaction_journals.*']);
+        if (is_null($journal)) {
+            return new TransactionJournal;
+        }
+
+        return $journal;
     }
 
     /**

@@ -6,7 +6,7 @@
 
 {% block content %}
     {{ Form.model(rule, {'class' : 'form-horizontal','id' : 'store','url' : route('rules.update', rule.id)}) }}
-    <input type="hidden" name="rule_group_id" value="{{ rule.rule_group_id }}"/>
+    <input type="hidden" name="id" value="{{ rule.id }}"/>
     <div class="row">
         <div class="col-lg-6 col-md-6 col-sm-12">
             <div class="box box-primary">
@@ -15,6 +15,7 @@
                 </div>
                 <div class="box-body">
                     {{ ExpandedForm.text('title') }}
+                    {{ ExpandedForm.select('rule_group_id', ruleGroups) }}
                     {{ ExpandedForm.select('trigger',allJournalTriggers(), primaryTrigger) }}
                     {{ ExpandedForm.checkbox('active',1,rule.active, {helpText: trans('firefly.rule_help_active')}) }}
                     {{ ExpandedForm.checkbox('stop_processing',1,rule.stop_processing, {helpText: trans('firefly.rule_help_stop_processing')}) }}
@@ -62,7 +63,7 @@
                     <p>
                         <br/>
                         <a href="#" class="btn btn-default add_rule_trigger">{{ 'add_rule_trigger'|_ }}</a>
-                        <a href="#" class="btn btn-default test_rule_triggers">{{ 'test_rule_triggers'|_ }}</a>
+                        <a href="#" class="btn btn-default test_rule_triggers"><i class="fa fa-flask"></i> {{ 'test_rule_triggers'|_ }}</a>
                     </p>
                 </div>
             </div>
@@ -126,11 +127,11 @@
 
 {% endblock %}
 {% block scripts %}
-    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js"></script>
+    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js?v={{ FF_VERSION }}"></script>
     <script type="text/javascript">
         var triggerCount = {{ triggerCount }};
         var actionCount = {{ actionCount }};
     </script>
-    <script type="text/javascript" src="js/ff/rules/create-edit.js"></script>
+    <script type="text/javascript" src="js/ff/rules/create-edit.js?v={{ FF_VERSION }}"></script>
 
 {% endblock %}

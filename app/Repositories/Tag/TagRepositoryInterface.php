@@ -1,21 +1,32 @@
 <?php
 /**
  * TagRepositoryInterface.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Tag;
 
 use Carbon\Carbon;
 use FireflyIII\Models\Tag;
 use FireflyIII\Models\TransactionJournal;
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 
@@ -26,6 +37,7 @@ use Illuminate\Support\Collection;
  */
 interface TagRepositoryInterface
 {
+
     /**
      * This method will connect a journal with a tag.
      *
@@ -35,6 +47,11 @@ interface TagRepositoryInterface
      * @return bool
      */
     public function connect(TransactionJournal $journal, Tag $tag): bool;
+
+    /**
+     * @return int
+     */
+    public function count(): int;
 
     /**
      * This method destroys a tag.
@@ -83,11 +100,28 @@ interface TagRepositoryInterface
     public function get(): Collection;
 
     /**
+     * @param string $type
+     *
+     * @return Collection
+     */
+    public function getByType(string $type): Collection;
+
+    /**
      * @param Tag $tag
      *
      * @return Carbon
      */
     public function lastUseDate(Tag $tag): Carbon;
+
+    /**
+     * @return Tag|null
+     */
+    public function oldestTag(): ?Tag;
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 
     /**
      * @param Tag    $tag
@@ -106,6 +140,35 @@ interface TagRepositoryInterface
      * @return Tag
      */
     public function store(array $data): Tag;
+
+    /**
+     * @param Tag         $tag
+     * @param Carbon|null $start
+     * @param Carbon|null $end
+     *
+     * @return string
+     */
+    public function sumOfTag(Tag $tag, ?Carbon $start, ?Carbon $end): string;
+
+    /**
+     * Calculates various amounts in tag.
+     *
+     * @param Tag         $tag
+     * @param Carbon|null $start
+     * @param Carbon|null $end
+     *
+     * @return array
+     */
+    public function sumsOfTag(Tag $tag, ?Carbon $start, ?Carbon $end): array;
+
+    /**
+     * Generates a tag cloud.
+     *
+     * @param int|null $year
+     *
+     * @return array
+     */
+    public function tagCloud(?int $year): array;
 
     /**
      * Update a tag.

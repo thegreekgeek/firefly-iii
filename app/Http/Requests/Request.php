@@ -1,15 +1,25 @@
 <?php
 /**
  * Request.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Requests;
 
@@ -28,7 +38,7 @@ class Request extends FormRequest
      *
      * @return bool
      */
-    protected function boolean(string $field): bool
+    public function boolean(string $field): bool
     {
         return intval($this->input($field)) === 1;
     }
@@ -36,58 +46,11 @@ class Request extends FormRequest
     /**
      * @param string $field
      *
-     * @return Carbon|null
-     */
-    protected function date(string $field)
-    {
-        return $this->get($field) ? new Carbon($this->get($field)) : null;
-    }
-
-    /**
-     * @param string $field
-     *
-     * @return float
-     */
-    protected function float(string $field): float
-    {
-        return round($this->input($field), 12);
-    }
-
-    /**
-     * @param string $field
-     * @param string $type
-     *
-     * @return array
-     */
-    protected function getArray(string $field, string $type): array
-    {
-        $original = $this->get($field);
-        $return   = [];
-        foreach ($original as $index => $value) {
-            $return[$index] = $this->$type($value);
-        }
-
-        return $return;
-    }
-
-    /**
-     * @param string $field
-     *
-     * @return int
-     */
-    protected function integer(string $field): int
-    {
-        return intval($this->get($field));
-    }
-
-    /**
-     * @param string $field
-     *
      * @return string
      */
-    protected function string(string $field): string
+    public function string(string $field): string
     {
-        $string = $this->get($field) ?? '';
+        $string  = $this->get($field) ?? '';
         $search  = [
             "\u{0001}", // start of heading
             "\u{0002}", // start of text
@@ -139,5 +102,52 @@ class Request extends FormRequest
         $string  = str_replace($search, $replace, $string);
 
         return trim($string);
+    }
+
+    /**
+     * @param string $field
+     *
+     * @return Carbon|null
+     */
+    protected function date(string $field)
+    {
+        return $this->get($field) ? new Carbon($this->get($field)) : null;
+    }
+
+    /**
+     * @param string $field
+     *
+     * @return float
+     */
+    protected function float(string $field): float
+    {
+        return round($this->input($field), 12);
+    }
+
+    /**
+     * @param string $field
+     * @param string $type
+     *
+     * @return array
+     */
+    protected function getArray(string $field, string $type): array
+    {
+        $original = $this->get($field);
+        $return   = [];
+        foreach ($original as $index => $value) {
+            $return[$index] = $this->$type($value);
+        }
+
+        return $return;
+    }
+
+    /**
+     * @param string $field
+     *
+     * @return int
+     */
+    protected function integer(string $field): int
+    {
+        return intval($this->get($field));
     }
 }

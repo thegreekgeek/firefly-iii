@@ -1,14 +1,55 @@
 /*
  * index.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** global: spent, budgeted, available, currencySymbol */
+/** global: spent, budgeted, available, currencySymbol, budgetIndexUri, updateIncomeUri, periodStart, periodEnd, budgetAmountUri, accounting */
+
+/**
+ *
+ */
+$(function () {
+    "use strict";
+
+    $('.updateIncome').on('click', updateIncome);
+    $('.infoIncome').on('click', infoIncome);
+
+    /*
+     On start, fill the "spent"-bar using the content from the page.
+     */
+    drawSpentBar();
+    drawBudgetedBar();
+
+    /*
+     When the input changes, update the percentages for the budgeted bar:
+     */
+    $('input[type="number"]').on('input', updateBudgetedAmounts);
+
+    //
+    $('.selectPeriod').change(function (e) {
+        var sel = $(e.target).val();
+        if (sel !== "x") {
+            var newUri = budgetIndexUri.replace("REPLACE", sel);
+            window.location.assign(newUri);
+        }
+    });
+
+});
 
 function drawSpentBar() {
     "use strict";
@@ -55,13 +96,34 @@ function drawBudgetedBar() {
     }
 }
 
+/**
+ *
+ * @param e
+ */
 function updateBudgetedAmounts(e) {
     "use strict";
     var target = $(e.target);
     var id = target.data('id');
+
     var value = target.val();
     var original = target.data('original');
     var difference = value - original;
+
+    var spentCell = $('td[class="spent"][data-id="' + id + '"]');
+    var leftCell = $('td[class="left"][data-id="' + id + '"]');
+    var spentAmount = parseFloat(spentCell.data('spent'));
+    var newAmountLeft = spentAmount + parseFloat(value);
+    var amountLeftString = accounting.formatMoney(newAmountLeft);
+    if (newAmountLeft < 0) {
+        leftCell.html('<span class="text-danger">' + amountLeftString + '</span>');
+    }
+    if (newAmountLeft > 0) {
+        leftCell.html('<span class="text-success">' + amountLeftString + '</span>');
+    }
+    if (newAmountLeft === 0.0) {
+        leftCell.html('<span style="color:#999">' + amountLeftString + '</span>');
+    }
+
     if (difference !== 0) {
         // add difference to 'budgeted' var
         budgeted = budgeted + difference;
@@ -72,7 +134,8 @@ function updateBudgetedAmounts(e) {
         drawBudgetedBar();
 
         // send a post to Firefly to update the amount:
-        $.post('budgets/amount/' + id, {amount: value}).done(function (data) {
+        var newUri = budgetAmountUri.replace("REPLACE", id);
+        $.post(newUri, {amount: value, start: periodStart, end: periodEnd}).done(function (data) {
             // update the link if relevant:
             if (data.repetition > 0) {
                 $('.budget-link[data-id="' + id + '"]').attr('href', 'budgets/show/' + id + '/' + data.repetition);
@@ -83,27 +146,21 @@ function updateBudgetedAmounts(e) {
     }
 }
 
-$(function () {
-    "use strict";
-
-    $('.updateIncome').on('click', updateIncome);
-
-    /*
-     On start, fill the "spent"-bar using the content from the page.
-     */
-    drawSpentBar();
-    drawBudgetedBar();
-
-    /*
-     When the input changes, update the percentages for the budgeted bar:
-     */
-    $('input[type="number"]').on('input', updateBudgetedAmounts);
-
-});
-
+/**
+ *
+ * @returns {boolean}
+ */
 function updateIncome() {
     "use strict";
-    $('#defaultModal').empty().load('budgets/income', function () {
+    $('#defaultModal').empty().load(updateIncomeUri, function () {
+        $('#defaultModal').modal('show');
+    });
+
+    return false;
+}
+
+function infoIncome() {
+    $('#defaultModal').empty().load(infoIncomeUri, function () {
         $('#defaultModal').modal('show');
     });
 

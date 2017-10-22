@@ -1,15 +1,25 @@
 <?php
 /**
  * ConvertController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Transaction;
 
@@ -64,11 +74,13 @@ class ConvertController extends Controller
      */
     public function index(TransactionType $destinationType, TransactionJournal $journal)
     {
+        // @codeCoverageIgnoreStart
         if ($this->isOpeningBalance($journal)) {
             return $this->redirectToAccount($journal);
         }
+        // @codeCoverageIgnoreEnd
 
-        $positiveAmount = TransactionJournal::amountPositive($journal);
+        $positiveAmount = $journal->amountPositive();
         $assetAccounts  = ExpandedForm::makeSelectList($this->accounts->getActiveAccountsByType([AccountType::DEFAULT, AccountType::ASSET]));
         $sourceType     = $journal->transactionType;
         $subTitle       = trans('firefly.convert_to_' . $destinationType->type, ['description' => $journal->description]);
@@ -83,14 +95,14 @@ class ConvertController extends Controller
 
         // cannot convert split.
         if ($journal->transactions()->count() > 2) {
-            Session::flash('error', trans('firefly.cannot_convert_split_journl'));
+            Session::flash('error', trans('firefly.cannot_convert_split_journal'));
 
             return redirect(route('transactions.show', [$journal->id]));
         }
 
         // get source and destination account:
-        $sourceAccount      = TransactionJournal::sourceAccountList($journal)->first();
-        $destinationAccount = TransactionJournal::destinationAccountList($journal)->first();
+        $sourceAccount      = $journal->sourceAccountList()->first();
+        $destinationAccount = $journal->destinationAccountList()->first();
 
         return view(
             'transactions.convert',
@@ -117,22 +129,22 @@ class ConvertController extends Controller
      */
     public function postIndex(Request $request, JournalRepositoryInterface $repository, TransactionType $destinationType, TransactionJournal $journal)
     {
+        // @codeCoverageIgnoreStart
         if ($this->isOpeningBalance($journal)) {
             return $this->redirectToAccount($journal);
         }
+        // @codeCoverageIgnoreEnd
 
         $data = $request->all();
 
-        // cannot convert to its own type.
         if ($journal->transactionType->type === $destinationType->type) {
             Session::flash('error', trans('firefly.convert_is_already_type_' . $destinationType->type));
 
             return redirect(route('transactions.show', [$journal->id]));
         }
 
-        // cannot convert split.
         if ($journal->transactions()->count() > 2) {
-            Session::flash('error', trans('firefly.cannot_convert_split_journl'));
+            Session::flash('error', trans('firefly.cannot_convert_split_journal'));
 
             return redirect(route('transactions.show', [$journal->id]));
         }
@@ -145,7 +157,7 @@ class ConvertController extends Controller
         $errors = $repository->convert($journal, $destinationType, $source, $destination);
 
         if ($errors->count() > 0) {
-            return redirect(route('transactions.convert', [strtolower($destinationType->type), $journal->id]))->withErrors($errors)->withInput();
+            return redirect(route('transactions.convert.index', [strtolower($destinationType->type), $journal->id]))->withErrors($errors)->withInput();
         }
 
         Session::flash('success', trans('firefly.converted_to_' . $destinationType->type));
@@ -165,21 +177,30 @@ class ConvertController extends Controller
     {
         /** @var AccountRepositoryInterface $accountRepository */
         $accountRepository  = app(AccountRepositoryInterface::class);
-        $sourceAccount      = TransactionJournal::sourceAccountList($journal)->first();
-        $destinationAccount = TransactionJournal::destinationAccountList($journal)->first();
+        $sourceAccount      = $journal->sourceAccountList()->first();
+        $destinationAccount = $journal->destinationAccountList()->first();
         $sourceType         = $journal->transactionType;
         $joined             = $sourceType->type . '-' . $destinationType->type;
         switch ($joined) {
             default:
-                throw new FireflyException('Cannot handle ' . $joined);
-            case TransactionType::WITHDRAWAL . '-' . TransactionType::DEPOSIT: // one
+                throw new FireflyException('Cannot handle ' . $joined); // @codeCoverageIgnore
+            case TransactionType::WITHDRAWAL . '-' . TransactionType::DEPOSIT:
+                // one
                 $destination = $sourceAccount;
                 break;
-            case TransactionType::WITHDRAWAL . '-' . TransactionType::TRANSFER: // two
+            case TransactionType::WITHDRAWAL . '-' . TransactionType::TRANSFER:
+                // two
                 $destination = $accountRepository->find(intval($data['destination_account_asset']));
                 break;
-            case TransactionType::DEPOSIT . '-' . TransactionType::WITHDRAWAL: // three
-            case TransactionType::TRANSFER . '-' . TransactionType::WITHDRAWAL: // five
+            case TransactionType::DEPOSIT . '-' . TransactionType::WITHDRAWAL:
+            case TransactionType::TRANSFER . '-' . TransactionType::WITHDRAWAL:
+                // three and five
+                if ($data['destination_account_expense'] === '' || is_null($data['destination_account_expense'])) {
+                    // destination is a cash account.
+                    $destination = $accountRepository->getCashAccount();
+
+                    return $destination;
+                }
                 $data        = [
                     'name'           => $data['destination_account_expense'],
                     'accountType'    => 'expense',
@@ -189,8 +210,9 @@ class ConvertController extends Controller
                 ];
                 $destination = $accountRepository->store($data);
                 break;
-            case TransactionType::DEPOSIT . '-' . TransactionType::TRANSFER: // four
-            case TransactionType::TRANSFER . '-' . TransactionType::DEPOSIT: // six
+            case TransactionType::DEPOSIT . '-' . TransactionType::TRANSFER:
+            case TransactionType::TRANSFER . '-' . TransactionType::DEPOSIT:
+                // four and six
                 $destination = $destinationAccount;
                 break;
         }
@@ -210,15 +232,23 @@ class ConvertController extends Controller
     {
         /** @var AccountRepositoryInterface $accountRepository */
         $accountRepository  = app(AccountRepositoryInterface::class);
-        $sourceAccount      = TransactionJournal::sourceAccountList($journal)->first();
-        $destinationAccount = TransactionJournal::destinationAccountList($journal)->first();
+        $sourceAccount      = $journal->sourceAccountList()->first();
+        $destinationAccount = $journal->destinationAccountList()->first();
         $sourceType         = $journal->transactionType;
         $joined             = $sourceType->type . '-' . $destinationType->type;
         switch ($joined) {
             default:
-                throw new FireflyException('Cannot handle ' . $joined);
-            case TransactionType::WITHDRAWAL . '-' . TransactionType::DEPOSIT: // one
-            case TransactionType::TRANSFER . '-' . TransactionType::DEPOSIT: // six
+                throw new FireflyException('Cannot handle ' . $joined); // @codeCoverageIgnore
+            case TransactionType::WITHDRAWAL . '-' . TransactionType::DEPOSIT:
+            case TransactionType::TRANSFER . '-' . TransactionType::DEPOSIT:
+
+                if ($data['source_account_revenue'] === '' || is_null($data['source_account_revenue'])) {
+                    // destination is a cash account.
+                    $destination = $accountRepository->getCashAccount();
+
+                    return $destination;
+                }
+
                 $data   = [
                     'name'           => $data['source_account_revenue'],
                     'accountType'    => 'revenue',
@@ -228,14 +258,14 @@ class ConvertController extends Controller
                 ];
                 $source = $accountRepository->store($data);
                 break;
-            case TransactionType::WITHDRAWAL . '-' . TransactionType::TRANSFER: // two
-            case TransactionType::TRANSFER . '-' . TransactionType::WITHDRAWAL: // five
+            case TransactionType::WITHDRAWAL . '-' . TransactionType::TRANSFER:
+            case TransactionType::TRANSFER . '-' . TransactionType::WITHDRAWAL:
                 $source = $sourceAccount;
                 break;
-            case TransactionType::DEPOSIT . '-' . TransactionType::WITHDRAWAL: // three
+            case TransactionType::DEPOSIT . '-' . TransactionType::WITHDRAWAL:
                 $source = $destinationAccount;
                 break;
-            case TransactionType::DEPOSIT . '-' . TransactionType::TRANSFER: // four
+            case TransactionType::DEPOSIT . '-' . TransactionType::TRANSFER:
                 $source = $accountRepository->find(intval($data['source_account_asset']));
                 break;
         }

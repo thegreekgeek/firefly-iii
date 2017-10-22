@@ -1,22 +1,30 @@
 <?php
 /**
  * BudgetReportHelper.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Helpers\Report;
 
 
 use Carbon\Carbon;
-use FireflyIII\Helpers\Collection\Budget as BudgetCollection;
-use FireflyIII\Helpers\Collection\BudgetLine;
 use FireflyIII\Models\Budget;
 use FireflyIII\Models\BudgetLimit;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
@@ -44,48 +52,68 @@ class BudgetReportHelper implements BudgetReportHelperInterface
 
     /**
      * @SuppressWarnings(PHPMD.CyclomaticComplexity) // it's exactly 5.
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength) // all the arrays make it long.
      * @param Carbon     $start
      * @param Carbon     $end
      * @param Collection $accounts
      *
-     * @return BudgetCollection
+     * @return array
      */
-    public function getBudgetReport(Carbon $start, Carbon $end, Collection $accounts): BudgetCollection
+    public function getBudgetReport(Carbon $start, Carbon $end, Collection $accounts): array
     {
-        $object = new BudgetCollection;
-        $set    = $this->repository->getBudgets();
+        $set   = $this->repository->getBudgets();
+        $array = [];
 
         /** @var Budget $budget */
         foreach ($set as $budget) {
             $budgetLimits = $this->repository->getBudgetLimits($budget, $start, $end);
-            if ($budgetLimits->count() == 0) { // no budget limit(s) for this budget
+            if ($budgetLimits->count() === 0) { // no budget limit(s) for this budget
+
                 $spent = $this->repository->spentInPeriod(new Collection([$budget]), $accounts, $start, $end);// spent for budget in time range
-                if ($spent > 0) {
-                    $budgetLine = new BudgetLine;
-                    $budgetLine->setBudget($budget)->setOverspent($spent);
-                    $object->addOverspent($spent)->addBudgetLine($budgetLine);
+                if (bccomp($spent, '0') === -1) {
+                    $line    = [
+                        'type'      => 'budget',
+                        'id'        => $budget->id,
+                        'name'      => $budget->name,
+                        'budgeted'  => '0',
+                        'spent'     => $spent,
+                        'left'      => '0',
+                        'overspent' => '0',
+                    ];
+                    $array[] = $line;
                 }
                 continue;
             }
             /** @var BudgetLimit $budgetLimit */
             foreach ($budgetLimits as $budgetLimit) { // one or more repetitions for budget
-                $data       = $this->calculateExpenses($budget, $budgetLimit, $accounts);
-                $budgetLine = new BudgetLine;
-                $budgetLine->setBudget($budget)->setBudgetLimit($budgetLimit)
-                           ->setLeft($data['left'])->setSpent($data['expenses'])->setOverspent($data['overspent'])
-                           ->setBudgeted(strval($budgetLimit->amount));
+                $data    = $this->calculateExpenses($budget, $budgetLimit, $accounts);
+                $line    = [
+                    'type'  => 'budget-line',
+                    'start' => $budgetLimit->start_date,
+                    'end'   => $budgetLimit->end_date,
+                    'limit' => $budgetLimit->id,
+                    'id'    => $budget->id,
+                    'name'  => $budget->name,
 
-                $object->addBudgeted(strval($budgetLimit->amount))->addSpent($data['spent'])
-                       ->addLeft($data['left'])->addOverspent($data['overspent'])->addBudgetLine($budgetLine);
-
+                    'budgeted'  => strval($budgetLimit->amount),
+                    'spent'     => $data['expenses'],
+                    'left'      => $data['left'],
+                    'overspent' => $data['overspent'],
+                ];
+                $array[] = $line;
             }
         }
-        $noBudget   = $this->repository->spentInPeriodWoBudget($accounts, $start, $end); // stuff outside of budgets
-        $budgetLine = new BudgetLine;
-        $budgetLine->setOverspent($noBudget)->setSpent($noBudget);
-        $object->addOverspent($noBudget)->addBudgetLine($budgetLine);
+        $noBudget = $this->repository->spentInPeriodWoBudget($accounts, $start, $end); // stuff outside of budgets
+        $line     = [
+            'type'      => 'no-budget',
+            'budgeted'  => '0',
+            'spent'     => $noBudget,
+            'left'      => '0',
+            'overspent' => '0',
+        ];
+        $array[]  = $line;
 
-        return $object;
+        return $array;
     }
 
     /**

@@ -1,15 +1,25 @@
 <?php
 /**
  * BillRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Bill;
 
@@ -36,16 +46,6 @@ class BillRepository implements BillRepositoryInterface
 
     /** @var User */
     private $user;
-
-    /**
-     * BillRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @param Bill $bill
@@ -126,7 +126,7 @@ class BillRepository implements BillRepositoryInterface
         $set = $set->sortBy(
             function (Bill $bill) {
 
-                $int = $bill->active == 1 ? 0 : 1;
+                $int = $bill->active ? 0 : 1;
 
                 return $int . strtolower($bill->name);
             }
@@ -178,7 +178,7 @@ class BillRepository implements BillRepositoryInterface
         $set = $set->sortBy(
             function (Bill $bill) {
 
-                $int = $bill->active == 1 ? 0 : 1;
+                $int = $bill->active === 1 ? 0 : 1;
 
                 return $int . strtolower($bill->name);
             }
@@ -261,7 +261,7 @@ class BillRepository implements BillRepositoryInterface
         $count    = strval($journals->count());
         /** @var TransactionJournal $journal */
         foreach ($journals as $journal) {
-            $sum = bcadd($sum, TransactionJournal::amountPositive($journal));
+            $sum = bcadd($sum, $journal->amountPositive());
         }
         $avg = '0';
         if ($journals->count() > 0) {
@@ -272,6 +272,8 @@ class BillRepository implements BillRepositoryInterface
     }
 
     /**
+     * The "paid dates" list is a list of dates of transaction journals that are linked to this bill.
+     *
      * @param Bill   $bill
      * @param Carbon $start
      * @param Carbon $end
@@ -380,7 +382,7 @@ class BillRepository implements BillRepositoryInterface
         $count    = strval($journals->count());
         /** @var TransactionJournal $journal */
         foreach ($journals as $journal) {
-            $sum = bcadd($sum, TransactionJournal::amountPositive($journal));
+            $sum = bcadd($sum, $journal->amountPositive());
         }
         $avg = '0';
         if ($journals->count() > 0) {
@@ -406,7 +408,7 @@ class BillRepository implements BillRepositoryInterface
         $cache->addProperty('nextDateMatch');
         $cache->addProperty($date);
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         // find the most recent date for this bill NOT in the future. Cache this date:
         $start = clone $bill->date;
@@ -443,7 +445,7 @@ class BillRepository implements BillRepositoryInterface
         $cache->addProperty('nextExpectedMatch');
         $cache->addProperty($date);
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
         // find the most recent date for this bill NOT in the future. Cache this date:
         $start = clone $bill->date;
@@ -488,15 +490,15 @@ class BillRepository implements BillRepositoryInterface
         if (false === $journal->isWithdrawal()) {
             return false;
         }
-        $destinationAccounts = TransactionJournal::destinationAccountList($journal);
-        $sourceAccounts      = TransactionJournal::sourceAccountList($journal);
+        $destinationAccounts = $journal->destinationAccountList();
+        $sourceAccounts      = $journal->sourceAccountList();
         $matches             = explode(',', $bill->match);
         $description         = strtolower($journal->description) . ' ';
-        $description .= strtolower(join(' ', $destinationAccounts->pluck('name')->toArray()));
-        $description .= strtolower(join(' ', $sourceAccounts->pluck('name')->toArray()));
+        $description         .= strtolower(join(' ', $destinationAccounts->pluck('name')->toArray()));
+        $description         .= strtolower(join(' ', $sourceAccounts->pluck('name')->toArray()));
 
         $wordMatch   = $this->doWordMatch($matches, $description);
-        $amountMatch = $this->doAmountMatch(TransactionJournal::amountPositive($journal), $bill->amount_min, $bill->amount_max);
+        $amountMatch = $this->doAmountMatch($journal->amountPositive(), $bill->amount_min, $bill->amount_max);
 
 
         /*
@@ -508,7 +510,7 @@ class BillRepository implements BillRepositoryInterface
 
             return true;
         }
-        if ($bill->id == $journal->bill_id) {
+        if ($bill->id === $journal->bill_id) {
             // if no match, but bill used to match, remove it:
             $journal->bill_id = null;
             $journal->save();
@@ -521,14 +523,21 @@ class BillRepository implements BillRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return Bill
      */
     public function store(array $data): Bill
     {
-
-
+        /** @var Bill $bill */
         $bill = Bill::create(
             [
                 'name'        => $data['name'],

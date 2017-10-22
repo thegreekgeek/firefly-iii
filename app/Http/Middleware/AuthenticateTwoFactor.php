@@ -1,21 +1,33 @@
 <?php
 /**
  * AuthenticateTwoFactor.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Middleware;
 
 use Closure;
+use Cookie;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Log;
 use Preferences;
 use Session;
 
@@ -55,8 +67,13 @@ class AuthenticateTwoFactor
         }
         $is2faEnabled = Preferences::get('twoFactorAuthEnabled', false)->data;
         $has2faSecret = !is_null(Preferences::get('twoFactorAuthSecret'));
-        $is2faAuthed  = Session::get('twofactor-authenticated');
+
+        // grab 2auth information from cookie, not from session.
+        $is2faAuthed = Cookie::get('twoFactorAuthenticated') === 'true';
+
         if ($is2faEnabled && $has2faSecret && !$is2faAuthed) {
+            Log::debug('Does not seem to be 2 factor authed, redirect.');
+
             return redirect(route('two-factor.index'));
         }
 

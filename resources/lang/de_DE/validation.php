@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -15,7 +17,6 @@ return [
     'deleted_user'                   => 'Aufgrund von Sicherheitsbeschränkungen ist eine Registrierung dieser Email-Adresse nicht zugelassen.',
     'rule_trigger_value'             => 'Dieser Wert ist für den ausgewählten Trigger ungültig.',
     'rule_action_value'              => 'Dieser Wert ist für die gewählte Aktion ungültig.',
-    'invalid_domain'                 => 'Aufgrund von Sicherheitsbeschränkungen ist eine Registrierung von dieser Domain nicht zugelassen.',
     'file_already_attached'          => 'Die hochgeladene Datei ":name" ist diesem Objekt bereits angehängt.',
     'file_attached'                  => 'Datei ":name" erfolgreich hochgeladen.',
     'file_invalid_mime'              => 'Die Datei ":name" ist vom Typ ":mime", welcher nicht zum Upload zugelassen ist.',
@@ -23,13 +24,13 @@ return [
     'belongs_to_user'                => 'Der Wert von :attribute ist nicht bekannt',
     'accepted'                       => ':attribute muss akzeptiert werden.',
     'bic'                            => 'Dies ist kein gültiger BIC.',
-    'more'                           => ':attribute must be larger than zero.',
+    'more'                           => ':attribute muss größer als Null sein.',
     'active_url'                     => ':attribute ist keine gültige URL.',
     'after'                          => ':attribute muss ein Datum nach :date sein.',
     'alpha'                          => ':attribute darf nur Buchstaben enthalten.',
     'alpha_dash'                     => ':attribute darf nur Buchstaben, Zahlen und Bindestrichen enthalten.',
-    'alpha_num'                      => ':attribute darf nur Buchzahlen und Zahlen enthalten.',
-    'array'                          => ':attribute muss eine Reihe sein.',
+    'alpha_num'                      => ':attribute darf nur Buchstaben und Zahlen enthalten.',
+    'array'                          => ':attribute muss eine Liste sein.',
     'unique_for_user'                => 'Es gibt bereits einen Eintrag mit diesem :attribute.',
     'before'                         => ':attribute muss ein Datum vor dem :date sein.',
     'unique_object_for_user'         => 'Der Name wird bereits verwendet',
@@ -45,7 +46,7 @@ return [
     'different'                      => ':attribute und :other müssen sich unterscheiden.',
     'digits'                         => ':attribute muss :digits Stellen haben.',
     'digits_between'                 => ':attribute muss zwischen :min und :max Stellen haben.',
-    'email'                          => ':attribute muss eine gültige E-Mailadresse sein.',
+    'email'                          => ':attribute muss eine gültige E-Mail Adresse sein.',
     'filled'                         => ':attribute Feld muss ausgefüllt sein.',
     'exists'                         => ':attribute ist ungültig.',
     'image'                          => ':attribute muss ein Bild sein.',
@@ -70,8 +71,8 @@ return [
     'required_unless'                => ':attribute Feld ist notwendig, außer :other ist in :values enthalten.',
     'required_with'                  => ':attribute Feld ist notwendig falls :values vorhanden sind.',
     'required_with_all'              => ':attribute Feld ist notwendig falls :values vorhanden sind.',
-    'required_without'               => ':attribute Feld ist notwenidig, falls :values nicht vorhanden ist.',
-    'required_without_all'           => ':attribute Feld ist notwenidig, falls kein :values vorhanden ist.',
+    'required_without'               => ':attribute Feld ist notwendig, falls :values nicht vorhanden ist.',
+    'required_without_all'           => ':attribute Feld ist notwendig, falls kein :values vorhanden ist.',
     'same'                           => ':attribute und :other müssen übereinstimmen.',
     'size.numeric'                   => ':attribute muss :size sein.',
     'size.file'                      => ':attribute muss :size Kilobytes groß sein.',
@@ -88,4 +89,5 @@ return [
     'in_array'                       => ':attribute existiert nicht in :other.',
     'present'                        => 'Das :attribute Feld muss vorhanden sein.',
     'amount_zero'                    => 'Der Gesamtbetrag darf nicht Null sein',
+    'secure_password'                => 'Das ist kein sicheres Passwort. Bitte versuche es erneut. Weitere Informationen finden Sie unter https://goo.gl/NCh2tN',
 ];

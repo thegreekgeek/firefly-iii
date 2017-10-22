@@ -1,20 +1,30 @@
 <?php
 /**
  * Tag.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
 use Crypt;
-use FireflyIII\Support\Models\TagSupport;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Watson\Validating\ValidatingTrait;
@@ -24,8 +34,10 @@ use Watson\Validating\ValidatingTrait;
  *
  * @package FireflyIII\Models
  */
-class Tag extends TagSupport
+class Tag extends Model
 {
+    use ValidatingTrait, SoftDeletes;
+
     /**
      * The attributes that should be casted to native types.
      *
@@ -44,7 +56,6 @@ class Tag extends TagSupport
     protected $fillable = ['user_id', 'tag', 'date', 'description', 'longitude', 'latitude', 'zoomLevel', 'tagMode'];
     protected $rules    = ['tag' => 'required|between:1,200',];
 
-    use ValidatingTrait, SoftDeletes;
 
     /**
      * @param array $fields
@@ -65,7 +76,7 @@ class Tag extends TagSupport
         $set = $query->get(['tags.*']);
         /** @var Tag $tag */
         foreach ($set as $tag) {
-            if ($tag->tag == $fields['tag']) {
+            if ($tag->tag === $fields['tag']) {
                 return $tag;
             }
         }
@@ -86,7 +97,7 @@ class Tag extends TagSupport
     public static function routeBinder(Tag $value)
     {
         if (auth()->check()) {
-            if ($value->user_id == auth()->user()->id) {
+            if (intval($value->user_id) === auth()->user()->id) {
                 return $value;
             }
         }
@@ -103,7 +114,7 @@ class Tag extends TagSupport
         $sum = '0';
         /** @var TransactionJournal $journal */
         foreach ($tag->transactionjournals as $journal) {
-            bcadd($sum, TransactionJournal::amount($journal));
+            bcadd($sum, $journal->amount());
         }
 
         return $sum;
@@ -132,6 +143,10 @@ class Tag extends TagSupport
      */
     public function getTagAttribute($value)
     {
+        if (is_null($value)) {
+            return null;
+        }
+
         return Crypt::decrypt($value);
     }
 

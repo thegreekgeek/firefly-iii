@@ -1,15 +1,25 @@
 <?php
 /**
  * JournalCollectorInterface.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Helpers\Collector;
 
@@ -17,6 +27,7 @@ use Carbon\Carbon;
 use FireflyIII\Models\Budget;
 use FireflyIII\Models\Category;
 use FireflyIII\Models\Tag;
+use FireflyIII\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -27,26 +38,17 @@ use Illuminate\Support\Collection;
  */
 interface JournalCollectorInterface
 {
+    /**
+     * @param string $filter
+     *
+     * @return JournalCollectorInterface
+     */
+    public function addFilter(string $filter): JournalCollectorInterface;
 
     /**
      * @return int
      */
     public function count(): int;
-
-    /**
-     * @return JournalCollectorInterface
-     */
-    public function disableFilter(): JournalCollectorInterface;
-
-    /**
-     * @return JournalCollectorInterface
-     */
-    public function disableInternalFilter(): JournalCollectorInterface;
-
-    /**
-     * @return JournalCollectorInterface
-     */
-    public function enableInternalFilter(): JournalCollectorInterface;
 
     /**
      * @return Collection
@@ -57,6 +59,13 @@ interface JournalCollectorInterface
      * @return LengthAwarePaginator
      */
     public function getPaginatedJournals(): LengthAwarePaginator;
+
+    /**
+     * @param string $filter
+     *
+     * @return JournalCollectorInterface
+     */
+    public function removeFilter(string $filter): JournalCollectorInterface;
 
     /**
      * @param Collection $accounts
@@ -83,7 +92,6 @@ interface JournalCollectorInterface
      * @return JournalCollectorInterface
      */
     public function setBudget(Budget $budget): JournalCollectorInterface;
-
 
     /**
      * @param Collection $budgets
@@ -143,11 +151,25 @@ interface JournalCollectorInterface
     public function setTag(Tag $tag): JournalCollectorInterface;
 
     /**
+     * @param Collection $tags
+     *
+     * @return JournalCollectorInterface
+     */
+    public function setTags(Collection $tags): JournalCollectorInterface;
+
+    /**
      * @param array $types
      *
      * @return JournalCollectorInterface
      */
     public function setTypes(array $types): JournalCollectorInterface;
+
+    public function setUser(User $user);
+
+    /**
+     *
+     */
+    public function startQuery();
 
     /**
      * @return JournalCollectorInterface

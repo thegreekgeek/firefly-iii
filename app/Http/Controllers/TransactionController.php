@@ -1,23 +1,38 @@
 <?php
 /**
  * TransactionController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
 use Carbon\Carbon;
+use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
+use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Repositories\Journal\JournalRepositoryInterface;
 use FireflyIII\Repositories\Journal\JournalTaskerInterface;
+use FireflyIII\Repositories\LinkType\LinkTypeRepositoryInterface;
+use FireflyIII\Support\CacheProperties;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Log;
@@ -57,124 +72,64 @@ class TransactionController extends Controller
      * @param JournalRepositoryInterface $repository
      * @param string                     $what
      *
+     * @param string                     $moment
+     *
      * @return View
      */
-    public function index(Request $request, JournalRepositoryInterface $repository, string $what)
+    public function index(Request $request, JournalRepositoryInterface $repository, string $what, string $moment = '')
     {
-        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
+        // default values:
         $subTitleIcon = config('firefly.transactionIconsByWhat.' . $what);
         $types        = config('firefly.transactionTypesByWhat.' . $what);
-        $subTitle     = trans('firefly.title_' . $what);
+        $page         = intval($request->get('page'));
+        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
         $range        = Preferences::get('viewRange', '1M')->data;
-        $page         = intval($request->get('page')) === 0 ? 1 : intval($request->get('page'));
-        // to make sure we only grab a subset, based on the current date (in session):
-        $start = session('start', Navigation::startOfPeriod(new Carbon, $range));
-        $end   = session('end', Navigation::endOfPeriod(new Carbon, $range));
+        $start        = null;
+        $end          = null;
+        $periods      = new Collection;
+        $path         = route('transactions.index', [$what]);
+
+        // prep for "all" view.
+        if ($moment === 'all') {
+            $subTitle = trans('firefly.all_' . $what);
+            $first    = $repository->first();
+            $start    = $first->date ?? new Carbon;
+            $end      = new Carbon;
+            $path     = route('transactions.index', [$what, 'all']);
+        }
+
+        // prep for "specific date" view.
+        if (strlen($moment) > 0 && $moment !== 'all') {
+            $start    = new Carbon($moment);
+            $end      = Navigation::endOfPeriod($start, $range);
+            $path     = route('transactions.index', [$what, $moment]);
+            $subTitle = trans(
+                'firefly.title_' . $what . '_between',
+                ['start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+            $periods  = $this->getPeriodOverview($what);
+        }
+
+        // prep for current period
+        if (strlen($moment) === 0) {
+            $start    = clone session('start', Navigation::startOfPeriod(new Carbon, $range));
+            $end      = clone session('end', Navigation::endOfPeriod(new Carbon, $range));
+            $periods  = $this->getPeriodOverview($what);
+            $subTitle = trans(
+                'firefly.title_' . $what . '_between',
+                ['start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+        }
 
         /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [auth()->user()]);
-        $collector->setTypes($types)->setLimit($pageSize)->setPage($page)->setAllAssetAccounts();
-        $collector->setRange($start, $end)->withBudgetInformation()->withCategoryInformation();
-
-        // do not filter transfers if $what = transfer.
-        if (!in_array($what, ['transfer', 'transfers'])) {
-            Log::debug('Also get opposing account info.');
-            $collector->withOpposingAccount();
-        }
-
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAllAssetAccounts()->setRange($start, $end)->setTypes($types)->setLimit($pageSize)->setPage($page)->withOpposingAccount();
+        $collector->removeFilter(InternalTransferFilter::class);
         $journals = $collector->getPaginatedJournals();
-        $journals->setPath('transactions/' . $what);
+        $journals->setPath($path);
 
-        unset($start, $end);
 
-        // then also show a list of periods where the user can click on, based on the
-        // user's range and the oldest journal the user has:
-        $first      = $repository->first();
-        $blockStart = is_null($first->id) ? new Carbon : $first->date;
-        $blockStart = Navigation::startOfPeriod($blockStart, $range);
-        $blockEnd   = Navigation::endOfX(new Carbon, $range);
-        $entries    = new Collection;
-
-        while ($blockEnd >= $blockStart) {
-            Log::debug(sprintf('Now at blockEnd: %s', $blockEnd->format('Y-m-d')));
-            $blockEnd = Navigation::startOfPeriod($blockEnd, $range);
-            $dateStr  = $blockEnd->format('Y-m-d');
-            $dateName = Navigation::periodShow($blockEnd, $range);
-            $entries->push([$dateStr, $dateName]);
-            $blockEnd = Navigation::subtractPeriod($blockEnd, $range, 1);
-        }
-
-        return view('transactions.index', compact('subTitle', 'what', 'subTitleIcon', 'journals', 'entries'));
-
-    }
-
-    /**
-     * @param Request $request
-     * @param string  $what
-     *
-     * @return View
-     */
-    public function indexAll(Request $request, string $what)
-    {
-        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
-        $subTitleIcon = config('firefly.transactionIconsByWhat.' . $what);
-        $types        = config('firefly.transactionTypesByWhat.' . $what);
-        $subTitle     = sprintf('%s (%s)', trans('firefly.title_' . $what), strtolower(trans('firefly.everything')));
-        $page         = intval($request->get('page')) === 0 ? 1 : intval($request->get('page'));
-
-        $collector = app(JournalCollectorInterface::class, [auth()->user()]);
-        $collector->setTypes($types)->setLimit($pageSize)->setPage($page)->setAllAssetAccounts()->withBudgetInformation()->withCategoryInformation();
-
-        // do not filter transfers if $what = transfer.
-        if (!in_array($what, ['transfer', 'transfers'])) {
-            Log::debug('Also get opposing account info.');
-            $collector->withOpposingAccount();
-        }
-
-        $journals = $collector->getPaginatedJournals();
-        $journals->setPath('transactions/' . $what . '/all');
-
-        return view('transactions.index-all', compact('subTitle', 'what', 'subTitleIcon', 'journals'));
-
-    }
-
-    /**
-     * @param Request $request
-     * @param string  $what
-     *
-     * @param string  $date
-     *
-     * @return View
-     */
-    public function indexByDate(Request $request, string $what, string $date)
-    {
-        $carbon       = new Carbon($date);
-        $range        = Preferences::get('viewRange', '1M')->data;
-        $start        = Navigation::startOfPeriod($carbon, $range);
-        $end          = Navigation::endOfPeriod($carbon, $range);
-        $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
-        $subTitleIcon = config('firefly.transactionIconsByWhat.' . $what);
-        $types        = config('firefly.transactionTypesByWhat.' . $what);
-        $subTitle     = trans('firefly.title_' . $what) . ' (' . Navigation::periodShow($carbon, $range) . ')';
-        $page         = intval($request->get('page')) === 0 ? 1 : intval($request->get('page'));
-
-        Log::debug(sprintf('Transaction index by date will show between %s and %s', $start->format('Y-m-d'), $end->format('Y-m-d')));
-
-        /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [auth()->user()]);
-        $collector->setTypes($types)->setLimit($pageSize)->setPage($page)->setAllAssetAccounts();
-        $collector->setRange($start, $end)->withBudgetInformation()->withCategoryInformation();
-
-        // do not filter transfers if $what = transfer.
-        if (!in_array($what, ['transfer', 'transfers'])) {
-            Log::debug('Also get opposing account info.');
-            $collector->withOpposingAccount();
-        }
-
-        $journals = $collector->getPaginatedJournals();
-        $journals->setPath('transactions/' . $what . '/' . $date);
-
-        return view('transactions.index-date', compact('subTitle', 'what', 'subTitleIcon', 'journals', 'carbon'));
+        return view('transactions.index', compact('subTitle', 'what', 'subTitleIcon', 'journals', 'periods', 'start', 'end', 'moment'));
 
     }
 
@@ -193,10 +148,9 @@ class TransactionController extends Controller
             $ids   = array_unique($ids);
             foreach ($ids as $id) {
                 $journal = $repository->find(intval($id));
-                if ($journal && $journal->date->format('Y-m-d') == $date->format('Y-m-d')) {
-                    $journal->order = $order;
+                if ($journal && $journal->date->isSameDay($date)) {
+                    $repository->setOrder($journal, $order);
                     $order++;
-                    $journal->save();
                 }
             }
         }
@@ -207,25 +161,130 @@ class TransactionController extends Controller
     }
 
     /**
-     * @param TransactionJournal     $journal
-     * @param JournalTaskerInterface $tasker
+     * @param TransactionJournal          $journal
+     * @param JournalTaskerInterface      $tasker
      *
-     * @return View
+     * @param LinkTypeRepositoryInterface $linkTypeRepository
+     *
+     * @return \Illuminate\Http\RedirectResponse|\Illuminate\Routing\Redirector|View
      */
-    public function show(TransactionJournal $journal, JournalTaskerInterface $tasker)
+    public function show(TransactionJournal $journal, JournalTaskerInterface $tasker, LinkTypeRepositoryInterface $linkTypeRepository)
     {
         if ($this->isOpeningBalance($journal)) {
             return $this->redirectToAccount($journal);
         }
-
+        $linkTypes    = $linkTypeRepository->get();
+        $links        = $linkTypeRepository->getLinks($journal);
         $events       = $tasker->getPiggyBankEvents($journal);
         $transactions = $tasker->getTransactionsOverview($journal);
         $what         = strtolower($journal->transaction_type_type ?? $journal->transactionType->type);
-        $subTitle     = trans('firefly.' . $what) . ' "' . e($journal->description) . '"';
+        $subTitle     = trans('firefly.' . $what) . ' "' . $journal->description . '"';
 
-        return view('transactions.show', compact('journal', 'events', 'subTitle', 'what', 'transactions'));
+        return view('transactions.show', compact('journal', 'events', 'subTitle', 'what', 'transactions', 'linkTypes', 'links'));
 
 
+    }
+
+    /**
+     * @param string $what
+     *
+     * @return Collection
+     * @throws FireflyException
+     */
+    private function getPeriodOverview(string $what): Collection
+    {
+        $repository = app(JournalRepositoryInterface::class);
+        $first      = $repository->first();
+        $start      = $first->date ?? new Carbon;
+        $range      = Preferences::get('viewRange', '1M')->data;
+        $start      = Navigation::startOfPeriod($start, $range);
+        $end        = Navigation::endOfX(new Carbon, $range, null);
+        $entries    = new Collection;
+        $types      = config('firefly.transactionTypesByWhat.' . $what);
+
+        // properties for cache
+        $cache = new CacheProperties;
+        $cache->addProperty($start);
+        $cache->addProperty($end);
+        $cache->addProperty($what);
+        $cache->addProperty('transaction-list-entries');
+
+        if ($cache->has()) {
+            return $cache->get(); // @codeCoverageIgnore
+        }
+
+        Log::debug(sprintf('Going to get period expenses and incomes between %s and %s.', $start->format('Y-m-d'), $end->format('Y-m-d')));
+        while ($end >= $start) {
+            Log::debug('Loop start!');
+            $end        = Navigation::startOfPeriod($end, $range);
+            $currentEnd = Navigation::endOfPeriod($end, $range);
+
+            // count journals without budget in this period:
+            /** @var JournalCollectorInterface $collector */
+            $collector = app(JournalCollectorInterface::class);
+            $collector->setAllAssetAccounts()->setRange($end, $currentEnd)->withOpposingAccount()->setTypes($types);
+            $collector->removeFilter(InternalTransferFilter::class);
+            $journals = $collector->getJournals();
+            $sum      = $journals->sum('transaction_amount');
+
+            // count per currency:
+            $sums     = $this->sumPerCurrency($journals);
+            $dateStr  = $end->format('Y-m-d');
+            $dateName = Navigation::periodShow($end, $range);
+            $array    = [
+                'string' => $dateStr,
+                'name'   => $dateName,
+                'sum'    => $sum,
+                'sums'   => $sums,
+                'date'   => clone $end,
+            ];
+            Log::debug(sprintf('What is %s', $what));
+            if ($journals->count() > 0) {
+                $entries->push($array);
+            }
+            $end = Navigation::subtractPeriod($end, $range, 1);
+        }
+        Log::debug('End of loop');
+        $cache->store($entries);
+
+        return $entries;
+    }
+
+    /**
+     * @param Collection $collection
+     *
+     * @return array
+     */
+    private function sumPerCurrency(Collection $collection): array
+    {
+        $return = [];
+        /** @var Transaction $transaction */
+        foreach ($collection as $transaction) {
+            $currencyId = $transaction->transaction_currency_id;
+
+            // save currency information:
+            if (!isset($return[$currencyId])) {
+                $currencySymbol      = $transaction->transaction_currency_symbol;
+                $decimalPlaces       = $transaction->transaction_currency_dp;
+                $currencyCode        = $transaction->transaction_currency_code;
+                $return[$currencyId] = [
+                    'currency' => [
+                        'id'     => $currencyId,
+                        'code'   => $currencyCode,
+                        'symbol' => $currencySymbol,
+                        'dp'     => $decimalPlaces,
+                    ],
+                    'sum'      => '0',
+                    'count'    => 0,
+                ];
+            }
+            // save amount:
+            $return[$currencyId]['sum'] = bcadd($return[$currencyId]['sum'], $transaction->transaction_amount);
+            $return[$currencyId]['count']++;
+        }
+        asort($return);
+
+        return $return;
     }
 
 }

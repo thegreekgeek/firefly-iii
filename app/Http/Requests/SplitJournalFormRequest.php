@@ -1,18 +1,29 @@
 <?php
 /**
  * SplitJournalFormRequest.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Requests;
 
+use Steam;
 
 /**
  * Class SplitJournalFormRequest
@@ -60,23 +71,23 @@ class SplitJournalFormRequest extends Request
     public function rules(): array
     {
         return [
-            'what'                          => 'required|in:withdrawal,deposit,transfer',
-            'journal_description'           => 'required|between:1,255',
-            'id'                            => 'numeric|belongsToUser:transaction_journals,id',
-            'journal_source_account_id'     => 'numeric|belongsToUser:accounts,id',
-            'journal_source_account_name.*' => 'between:1,255',
-            'journal_currency_id'           => 'required|exists:transaction_currencies,id',
-            'date'                          => 'required|date',
-            'interest_date'                 => 'date',
-            'book_date'                     => 'date',
-            'process_date'                  => 'date',
-            'description.*'                 => 'required|between:1,255',
-            'destination_account_id.*'      => 'numeric|belongsToUser:accounts,id',
-            'destination_account_name.*'    => 'between:1,255',
-            'amount.*'                      => 'required|numeric',
-            'budget_id.*'                   => 'belongsToUser:budgets,id',
-            'category.*'                    => 'between:1,255',
-            'piggy_bank_id.*'               => 'between:1,255',
+            'what'                                    => 'required|in:withdrawal,deposit,transfer',
+            'journal_description'                     => 'required|between:1,255',
+            'id'                                      => 'numeric|belongsToUser:transaction_journals,id',
+            'journal_source_account_id'               => 'numeric|belongsToUser:accounts,id',
+            'journal_source_account_name.*'           => 'between:1,255',
+            'journal_currency_id'                     => 'required|exists:transaction_currencies,id',
+            'date'                                    => 'required|date',
+            'interest_date'                           => 'date|nullable',
+            'book_date'                               => 'date|nullable',
+            'process_date'                            => 'date|nullable',
+            'transactions.*.description'              => 'required|between:1,255',
+            'transactions.*.destination_account_id'   => 'numeric|belongsToUser:accounts,id',
+            'transactions.*.destination_account_name' => 'between:1,255|nullable',
+            'transactions.*.amount'                   => 'required|numeric',
+            'transactions.*.budget_id'                => 'belongsToUser:budgets,id',
+            'transactions.*.category'                 => 'between:1,255|nullable',
+            'transactions.*.piggy_bank_id'            => 'between:1,255|nullable',
         ];
     }
 
@@ -101,7 +112,7 @@ class SplitJournalFormRequest extends Request
             $category    = $categories[$index] ?? '';
             $transaction = [
                 'description'              => $description,
-                'amount'                   => $amounts[$index],
+                'amount'                   => Steam::positive($amounts[$index]),
                 'budget_id'                => $budgets[$index] ?? 0,
                 'category'                 => $category,
                 'source_account_id'        => $srcAccountIds[$index] ?? $this->get('journal_source_account_id'),

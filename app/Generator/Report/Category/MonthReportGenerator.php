@@ -1,15 +1,25 @@
 <?php
 /**
  * MonthReportGenerator.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Generator\Report\Category;
 
@@ -18,6 +28,10 @@ use Carbon\Carbon;
 use FireflyIII\Generator\Report\ReportGeneratorInterface;
 use FireflyIII\Generator\Report\Support;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\NegativeAmountFilter;
+use FireflyIII\Helpers\Filter\OpposingAccountFilter;
+use FireflyIII\Helpers\Filter\PositiveAmountFilter;
+use FireflyIII\Helpers\Filter\TransferFilter;
 use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionType;
 use Illuminate\Support\Collection;
@@ -142,51 +156,19 @@ class MonthReportGenerator extends Support implements ReportGeneratorInterface
     }
 
     /**
-     * @param Collection $collection
-     * @param int        $sortFlag
+     * @param Collection $tags
      *
-     * @return array
+     * @return ReportGeneratorInterface
      */
-    private function getAverages(Collection $collection, int $sortFlag): array
+    public function setTags(Collection $tags): ReportGeneratorInterface
     {
-        $result = [];
-        /** @var Transaction $transaction */
-        foreach ($collection as $transaction) {
-            // opposing name and ID:
-            $opposingId = $transaction->opposing_account_id;
-
-            // is not set?
-            if (!isset($result[$opposingId])) {
-                $name                = $transaction->opposing_account_name;
-                $result[$opposingId] = [
-                    'name'    => $name,
-                    'count'   => 1,
-                    'id'      => $opposingId,
-                    'average' => $transaction->transaction_amount,
-                    'sum'     => $transaction->transaction_amount,
-                ];
-                continue;
-            }
-            $result[$opposingId]['count']++;
-            $result[$opposingId]['sum']     = bcadd($result[$opposingId]['sum'], $transaction->transaction_amount);
-            $result[$opposingId]['average'] = bcdiv($result[$opposingId]['sum'], strval($result[$opposingId]['count']));
-        }
-
-        // sort result by average:
-        $average = [];
-        foreach ($result as $key => $row) {
-            $average[$key] = floatval($row['average']);
-        }
-
-        array_multisort($average, $sortFlag, $result);
-
-        return $result;
+        return $this;
     }
 
     /**
      * @return Collection
      */
-    private function getExpenses(): Collection
+    protected function getExpenses(): Collection
     {
         if ($this->expenses->count() > 0) {
             Log::debug('Return previous set of expenses.');
@@ -195,14 +177,16 @@ class MonthReportGenerator extends Support implements ReportGeneratorInterface
         }
 
         /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [auth()->user()]);
+        $collector = app(JournalCollectorInterface::class);
         $collector->setAccounts($this->accounts)->setRange($this->start, $this->end)
                   ->setTypes([TransactionType::WITHDRAWAL, TransactionType::TRANSFER])
-                  ->setCategories($this->categories)->withOpposingAccount()->disableFilter();
+                  ->setCategories($this->categories)->withOpposingAccount();
+        $collector->removeFilter(TransferFilter::class);
 
-        $accountIds     = $this->accounts->pluck('id')->toArray();
+        $collector->addFilter(OpposingAccountFilter::class);
+        $collector->addFilter(PositiveAmountFilter::class);
+
         $transactions   = $collector->getJournals();
-        $transactions   = self::filterExpenses($transactions, $accountIds);
         $this->expenses = $transactions;
 
         return $transactions;
@@ -211,102 +195,25 @@ class MonthReportGenerator extends Support implements ReportGeneratorInterface
     /**
      * @return Collection
      */
-    private function getIncome(): Collection
+    protected function getIncome(): Collection
     {
         if ($this->income->count() > 0) {
             return $this->income;
         }
 
         /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [auth()->user()]);
+        $collector = app(JournalCollectorInterface::class);
         $collector->setAccounts($this->accounts)->setRange($this->start, $this->end)
                   ->setTypes([TransactionType::DEPOSIT, TransactionType::TRANSFER])
                   ->setCategories($this->categories)->withOpposingAccount();
-        $accountIds   = $this->accounts->pluck('id')->toArray();
+
+        $collector->addFilter(OpposingAccountFilter::class);
+        $collector->addFilter(NegativeAmountFilter::class);
+
         $transactions = $collector->getJournals();
-        $transactions = self::filterIncome($transactions, $accountIds);
         $this->income = $transactions;
 
         return $transactions;
-    }
-
-    /**
-     * @SuppressWarnings(PHPMD.CyclomaticComplexity) // it's exactly five.
-     * @param array $spent
-     * @param array $earned
-     *
-     * @return array
-     */
-    private function getObjectSummary(array $spent, array $earned): array
-    {
-        $return = [];
-
-        /**
-         * @var int    $accountId
-         * @var string $entry
-         */
-        foreach ($spent as $objectId => $entry) {
-            if (!isset($return[$objectId])) {
-                $return[$objectId] = ['spent' => 0, 'earned' => 0];
-            }
-
-            $return[$objectId]['spent'] = $entry;
-        }
-        unset($entry);
-
-        /**
-         * @var int    $accountId
-         * @var string $entry
-         */
-        foreach ($earned as $objectId => $entry) {
-            if (!isset($return[$objectId])) {
-                $return[$objectId] = ['spent' => 0, 'earned' => 0];
-            }
-
-            $return[$objectId]['earned'] = $entry;
-        }
-
-
-        return $return;
-    }
-
-
-    /**
-     * @return Collection
-     */
-    private function getTopExpenses(): Collection
-    {
-        $transactions = $this->getExpenses()->sortBy('transaction_amount');
-
-        return $transactions;
-    }
-
-    /**
-     * @return Collection
-     */
-    private function getTopIncome(): Collection
-    {
-        $transactions = $this->getIncome()->sortByDesc('transaction_amount');
-
-        return $transactions;
-    }
-
-    /**
-     * @param Collection $collection
-     *
-     * @return array
-     */
-    private function summarizeByAccount(Collection $collection): array
-    {
-        $result = [];
-        /** @var Transaction $transaction */
-        foreach ($collection as $transaction) {
-            $accountId          = $transaction->account_id;
-            $result[$accountId] = $result[$accountId] ?? '0';
-            $result[$accountId] = bcadd($transaction->transaction_amount, $result[$accountId]);
-        }
-
-        return $result;
     }
 
     /**

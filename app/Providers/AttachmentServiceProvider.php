@@ -1,20 +1,31 @@
 <?php
 /**
  * AttachmentServiceProvider.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 namespace FireflyIII\Providers;
 
-use FireflyIII\Exceptions\FireflyException;
+use FireflyIII\Repositories\Attachment\AttachmentRepository;
+use FireflyIII\Repositories\Attachment\AttachmentRepositoryInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -43,16 +54,15 @@ class AttachmentServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->bind(
-            'FireflyIII\Repositories\Attachment\AttachmentRepositoryInterface',
-            function (Application $app, array $arguments) {
-                if (!isset($arguments[0]) && $app->auth->check()) {
-                    return app('FireflyIII\Repositories\Attachment\AttachmentRepository', [auth()->user()]);
-                }
-                if (!isset($arguments[0]) && !$app->auth->check()) {
-                    throw new FireflyException('There is no user present.');
+            AttachmentRepositoryInterface::class,
+            function (Application $app) {
+                /** @var AttachmentRepositoryInterface $repository */
+                $repository = app(AttachmentRepository::class);
+                if ($app->auth->check()) {
+                    $repository->setUser(auth()->user());
                 }
 
-                return app('FireflyIII\Repositories\Attachment\AttachmentRepository', $arguments);
+                return $repository;
             }
         );
     }

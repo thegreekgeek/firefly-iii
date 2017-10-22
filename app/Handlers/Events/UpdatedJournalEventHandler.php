@@ -1,15 +1,25 @@
 <?php
 /**
  * UpdatedJournalEventHandler.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Handlers\Events;
 
@@ -17,16 +27,31 @@ namespace FireflyIII\Handlers\Events;
 use FireflyIII\Events\UpdatedTransactionJournal;
 use FireflyIII\Models\Rule;
 use FireflyIII\Models\RuleGroup;
-use FireflyIII\Rules\Processor;
+use FireflyIII\Repositories\RuleGroup\RuleGroupRepositoryInterface;
 use FireflyIII\Support\Events\BillScanner;
+use FireflyIII\TransactionRules\Processor;
 
 /**
+ * @codeCoverageIgnore
+ *
  * Class UpdatedJournalEventHandler
  *
  * @package FireflyIII\Handlers\Events
  */
 class UpdatedJournalEventHandler
 {
+    /** @var  RuleGroupRepositoryInterface */
+    public $repository;
+
+    /**
+     * StoredJournalEventHandler constructor.
+     *
+     * @param RuleGroupRepositoryInterface $ruleGroupRepository
+     */
+    public function __construct(RuleGroupRepositoryInterface $ruleGroupRepository)
+    {
+        $this->repository = $ruleGroupRepository;
+    }
 
     /**
      * This method will check all the rules when a journal is updated.
@@ -39,16 +64,11 @@ class UpdatedJournalEventHandler
     {
         // get all the user's rule groups, with the rules, order by 'order'.
         $journal = $updatedJournalEvent->journal;
-        $groups  = $journal->user->ruleGroups()->where('rule_groups.active', 1)->orderBy('order', 'ASC')->get();
-        //
+        $groups  = $this->repository->getActiveGroups($journal->user);
+
         /** @var RuleGroup $group */
         foreach ($groups as $group) {
-            $rules = $group->rules()
-                           ->leftJoin('rule_triggers', 'rules.id', '=', 'rule_triggers.rule_id')
-                           ->where('rule_triggers.trigger_type', 'user_action')
-                           ->where('rule_triggers.trigger_value', 'update-journal')
-                           ->where('rules.active', 1)
-                           ->get(['rules.*']);
+            $rules = $this->repository->getActiveUpdateRules($group);
             /** @var Rule $rule */
             foreach ($rules as $rule) {
                 $processor = Processor::make($rule);

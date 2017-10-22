@@ -1,29 +1,45 @@
 <?php
+
 /**
  * TestCase.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+declare(strict_types=1);
+
+namespace Tests;
 
 use Carbon\Carbon;
 use FireflyIII\Models\Preference;
 use FireflyIII\User;
+use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Log;
+use Mockery;
 
 /**
  * Class TestCase
+ *
+ * @package Tests
+ * @SuppressWarnings(PHPMD.NumberOfChildren)
  */
-abstract class TestCase extends Illuminate\Foundation\Testing\TestCase
+abstract class TestCase extends BaseTestCase
 {
-    /**
-     * The base URL to use while testing the application.
-     *
-     * @var string
-     */
-    protected $baseUrl = 'http://localhost';
+    use CreatesApplication;
 
     /**
      * @param User   $user
@@ -55,20 +71,6 @@ abstract class TestCase extends Illuminate\Foundation\Testing\TestCase
     }
 
     /**
-     * Creates the application.
-     *
-     * @return \Illuminate\Foundation\Application
-     */
-    public function createApplication()
-    {
-        $app = require __DIR__ . '/../bootstrap/app.php';
-
-        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
-        return $app;
-    }
-
-    /**
      * @return array
      */
     public function dateRangeProvider()
@@ -95,39 +97,6 @@ abstract class TestCase extends Illuminate\Foundation\Testing\TestCase
     }
 
     /**
-     * @return array
-     */
-    public function naughtyStringProvider()
-    {
-        /*
-         * If on Travis, return very small set.
-         */
-        if (getenv('TRAVIS') == 'true') {
-            return [['Default value']];
-
-        }
-        $path    = realpath(__DIR__ . '/../resources/tests/blns.base64.json');
-        $content = file_get_contents($path);
-        $array   = json_decode($content);
-        $return  = [];
-        foreach ($array as $entry) {
-            $return[] = [base64_decode($entry)];
-        }
-
-        return $return;
-    }
-
-    /**
-     * Sets up the fixture, for example, opens a network connection.
-     * This method is called before a test is executed.
-     */
-    public function setUp()
-    {
-        parent::setUp();
-
-    }
-
-    /**
      * @return User
      */
     public function user()
@@ -150,4 +119,5 @@ abstract class TestCase extends Illuminate\Foundation\Testing\TestCase
 
         return $object;
     }
+
 }

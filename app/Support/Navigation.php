@@ -1,15 +1,25 @@
 <?php
 /**
  * Navigation.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support;
 
@@ -62,6 +72,13 @@ class Navigation
         $function = $functionMap[$repeatFreq];
         $date->$function($add);
 
+        // if period is 1M and diff in month is 2 and new DOM = 1, sub a day:
+        $months     = ['1M', 'month', 'monthly'];
+        $difference = $date->month - $theDate->month;
+        if (in_array($repeatFreq, $months) && $difference === 2 && $date->day === 1) {
+            $date->subDay();
+        }
+
         return $date;
     }
 
@@ -72,7 +89,7 @@ class Navigation
      * @return \Carbon\Carbon
      * @throws FireflyException
      */
-    public function endOfPeriod(Carbon $end, string $repeatFreq): Carbon
+    public function endOfPeriod(\Carbon\Carbon $end, string $repeatFreq): Carbon
     {
         $currentEnd = clone $end;
 
@@ -96,7 +113,7 @@ class Navigation
         // if the range is custom, the end of the period
         // is another X days (x is the difference between start)
         // and end added to $theCurrentEnd
-        if ($repeatFreq == 'custom') {
+        if ($repeatFreq === 'custom') {
             /** @var Carbon $tStart */
             $tStart = session('start', Carbon::now()->startOfMonth());
             /** @var Carbon $tEnd */
@@ -135,7 +152,7 @@ class Navigation
      *
      * @return Carbon
      */
-    public function endOfX(Carbon $theCurrentEnd, string $repeatFreq, Carbon $maxDate = null): Carbon
+    public function endOfX(Carbon $theCurrentEnd, string $repeatFreq, ?Carbon $maxDate): Carbon
     {
         $functionMap = [
             '1D'        => 'endOfDay',
@@ -208,14 +225,15 @@ class Navigation
     }
 
     /**
-     * @param \Carbon\Carbon $date
+     * @param \Carbon\Carbon $theDate
      * @param                $repeatFrequency
      *
      * @return string
      * @throws FireflyException
      */
-    public function periodShow(Carbon $date, string $repeatFrequency): string
+    public function periodShow(Carbon $theDate, string $repeatFrequency): string
     {
+        $date = clone $theDate;
         $formatMap = [
             '1D'      => trans('config.specific_day'),
             'daily'   => trans('config.specific_day'),
@@ -393,7 +411,7 @@ class Navigation
 
             return $date;
         }
-        if ($repeatFreq == 'half-year' || $repeatFreq == '6M') {
+        if ($repeatFreq === 'half-year' || $repeatFreq === '6M') {
             $month = $date->month;
             $date->startOfYear();
             if ($month >= 7) {
@@ -496,7 +514,7 @@ class Navigation
 
             return $end;
         }
-        if ($range == '6M') {
+        if ($range === '6M') {
             if ($start->month >= 7) {
                 $end->endOfYear();
 
@@ -532,7 +550,7 @@ class Navigation
 
             return $start;
         }
-        if ($range == '6M') {
+        if ($range === '6M') {
             if ($start->month >= 7) {
                 $start->startOfYear()->addMonths(6);
 

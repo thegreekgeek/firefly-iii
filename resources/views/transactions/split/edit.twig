@@ -10,6 +10,7 @@
         <input name="_token" type="hidden" value="{{ csrf_token() }}">
         <input type="hidden" name="id" value="{{ journal.id }}"/>
         <input type="hidden" name="what" value="{{ preFilled.what }}"/>
+        <input type="hidden" name="journal_currency_id" value="{{ journal.transaction_currency_id }}"/>
 
         {% if errors.all()|length > 0 %}
             <div class="row">
@@ -30,7 +31,7 @@
             </div>
         {% endif %}
         <div class="row">
-            <div class="col-lg-6 col-md-6 col-sm-6">
+            <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
                 <div class="box">
                     <div class="box-header with-border">
                         <h3 class="box-title">{{ 'transaction_data'|_ }}</h3>
@@ -39,9 +40,6 @@
 
                         {# DESCRIPTION IS ALWAYS AVAILABLE #}
                         {{ ExpandedForm.text('journal_description', journal.description) }}
-
-                        {# CURRENCY IS NEW FOR SPLIT JOURNALS #}
-                        {{ ExpandedForm.select('currency_id', currencies, preFilled.currency_id) }}
 
                         {# show source if withdrawal or transfer #}
                         {% if preFilled.what == 'withdrawal' or preFilled.what == 'transfer' %}
@@ -59,15 +57,23 @@
                         {% endif %}
 
                         {# TOTAL AMOUNT IS STATIC TEXT #}
-                        {{ ExpandedForm.staticText('journal_amount', preFilled.journal_amount|formatAmount ) }}
-                        <input type="hidden" name="journal_amount" value="{{ preFilled.journal_amount }}"/>
+                        {% if preFilled.what == 'withdrawal' or preFilled.what == 'transfer' %}
+                            {{ ExpandedForm.staticText('journal_amount', formatAmountByAccount(accountArray[preFilled.journal_source_account_id], preFilled.journal_amount, true) ) }}
+                            <input type="hidden" name="journal_amount" value="{{ preFilled.journal_amount }}"/>
+                        {% endif %}
+
+                        {% if preFilled.what == 'deposit' %}
+                            {{ ExpandedForm.staticText('journal_amount', formatAmountByAccount(accountArray[preFilled.journal_destination_account_id], preFilled.journal_amount, true) ) }}
+                            <input type="hidden" name="journal_amount" value="{{ preFilled.journal_amount }}"/>
+                        {% endif %}
+
 
                         {# DATE #}
                         {{ ExpandedForm.date('date', journal.date) }}
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6 col-md-6 col-sm-6">
+            <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
                 <div class="box">
                     <div class="box-header with-border">
                         <h3 class="box-title">{{ 'optional_field_meta_data'|_ }}</h3>
@@ -94,7 +100,7 @@
                 not optionalFields.internal_reference or
                 not optionalFields.notes or
                 not optionalFields.attachments %}
-                    <p class="text-center text-success"><i class="fa fa-info-circle" aria-hidden="true"></i>
+                    <p class="text-center text-success"><i class="fa fa-info-circle"></i>
                         <em>{{ trans('firefly.hidden_fields_preferences', {link: route('preferences.index')})|raw }}</em></p>
                 {% endif %}
 
@@ -157,7 +163,7 @@
 
                             {# NOTES #}
                             {% if optionalFields.notes  or journal.notes %}
-                                {{ ExpandedForm.textarea('notes', journal.notes) }}
+                                {{ ExpandedForm.textarea('notes',preFilled.notes) }}
                             {% endif %}
                         </div>
                     </div>
@@ -187,89 +193,114 @@
                         <h3 class="box-title">{{ 'splits'|_ }}</h3>
                     </div>
                     <div class="box-body">
-                        <table class="table table-bordered table-condensed table-striped split-table">
-                            <thead>
-                            <tr>
-                                <th>&nbsp;</th>
-                                <th>{{ trans('list.split_number') }}</th>
-                                <th>{{ trans('list.description') }}</th>
-
+                        <div class="container-fluid split_row_holder">
+                            <div class="row bg-gray-light" style="padding-bottom:3px;">
+                                <div class="col-lg-1 col-md-1 col-sm-6 col-xs-6">&nbsp;</div>
+                                <div class="col-lg-1 col-md-1 col-sm-6 col-xs-6"><strong>{{ trans('list.split_number') }}</strong></div>
+                                <div class="col-lg-3 col-md-5 col-sm-12 col-xs-12"><strong>{{ trans('list.description') }}</strong></div>
                                 {# withdrawal and deposit have a destination. #}
                                 {% if preFilled.what == 'withdrawal' %}
-                                    <th>{{ trans('list.destination') }}</th>
+                                    <div class="col-lg-2 col-md-5 col-sm-12 col-xs-12"><strong>{{ trans('list.destination') }}</strong></div>
                                 {% endif %}
-
-                                {# DEPOSIT HAS A SOURCE #}
+                                {# Deposit has a source #}
                                 {% if preFilled.what == 'deposit' %}
-                                    <th>{{ trans('list.source') }}</th>
+                                    <div class="col-lg-2 col-md-5 col-sm-12 col-xs-12"><strong>{{ trans('list.source') }}</strong></div>
                                 {% endif %}
-
-                                <th>{{ trans('list.amount') }}</th>
-
+                                <div class="col-lg-1 col-md-5 col-sm-12 col-xs-12"><strong>{{ trans('list.amount') }}</strong></div>
+                                <div class="col-lg-1 col-md-7 col-sm-12 col-xs-12">
+                                    &nbsp;
+                                </div>
                                 {# only withdrawal has budget #}
                                 {% if preFilled.what == 'withdrawal' %}
-                                    <th>{{ trans('list.budget') }}</th>
+                                    <div class="col-lg-1 col-md-6 col-sm-12 col-xs-12"><strong>{{ trans('list.budget') }}</strong></div>
                                 {% endif %}
+                                <div class="col-lg-2 col-md-6 col-sm-12 col-xs-12"><strong>{{ trans('list.category') }}</strong></div>
+                            </div>
 
-                                <th>{{ trans('list.category') }}</th>
-                            </tr>
-                            </thead>
-                            <tbody>
                             {% for index, transaction in preFilled.transactions %}
-                                <tr data-split="{{ loop.index0 }}">
-                                    <td><a href="#" class="btn btn-xs btn-danger remove-current-split" data-split="{{ loop.index0 }}"><i
-                                                    class="fa fa-trash" data-split="{{ loop.index0 }}"></i></a></td>
-                                    <td class="count">#{{ loop.index }}</td>
-                                    <td>
+                                <div class="row {% if loop.index0 % 2 == 1 %}bg-gray-light{% endif %} split_row" data-split="{{ loop.index0 }}">
+                                    {# button #}
+                                    <div class="col-lg-1 col-md-1 col-sm-6 col-xs-6">
+                                        <a href="#" class="btn btn-xs btn-danger remove-current-split" data-split="{{ loop.index0 }}">
+                                            <i class="fa fa-trash" data-split="{{ loop.index0 }}"></i></a>
+                                    </div>
+
+                                    {# index #}
+                                    <div class="col-lg-1 col-md-1 col-sm-6 col-xs-6 count">#{{ loop.index }}</div>
+
+                                    {# description #}
+                                    <div class="col-lg-3 col-md-5 col-sm-12 col-xs-12">
                                         <input type="text" name="transactions[{{ loop.index0 }}][description]" value="{{ transaction.description }}"
                                                class="form-control"/>
-                                    </td>
+                                    </div>
 
-                                    <!-- withdrawal has several destination names. -->
+                                    {# destination for withdrawals: #}
                                     {% if preFilled.what == 'withdrawal' %}
-                                        <td>
+                                        <div class="col-lg-2 col-md-5 col-sm-12 col-xs-12">
                                             <input type="text" name="transactions[{{ loop.index0 }}][destination_account_name]"
-                                                   value="{{ transaction.destination_account_name }}"
-                                                   class="form-control"/>
-                                        </td>
+                                                   value="{{ transaction.destination_account_name }}" class="form-control"/>
+                                        </div>
                                     {% endif %}
 
-                                    <!-- deposit has several source names -->
+                                    {# source for deposits #}
                                     {% if preFilled.what == 'deposit' %}
-                                        <td>
+                                        <div class="col-lg-2 col-md-5 col-sm-12 col-xs-12">
                                             <input type="text" name="transactions[{{ loop.index0 }}][source_account_name]"
-                                                   value="{{ transaction.source_account_name }}"
-                                                   class="form-control"/>
-                                        </td>
+                                                   value="{{ transaction.source_account_name }}" class="form-control"/>
+                                        </div>
                                     {% endif %}
 
+                                    {# amount#}
+                                    {% if transaction.foreign_amount != null %}
+                                    <div class="col-lg-1 col-md-5 col-sm-12 col-xs-12">
+                                    {% else %}
+                                    <div class="col-lg-2 col-md-5 col-sm-12 col-xs-12">
+                                    {% endif %}
+                                        <div class="input-group">
+                                            <div class="input-group-addon">{{ transaction.transaction_currency_symbol }}</div>
+                                            <input type="number" name="transactions[{{ loop.index0 }}][amount]" value="{{ transaction.amount }}"
+                                                   class="form-control" autocomplete="off" step="any">
+                                        </div>
+                                        <input type="hidden" name="transactions[{{ loop.index0 }}][transaction_currency_id]"
+                                               value="{{ transaction.transaction_currency_id }}">
+                                    </div>
 
-                                    <td style="width:10%;">
-                                        <input type="number" name="transactions[{{ loop.index0 }}][amount]" value="{{ transaction.amount }}"
-                                               class="form-control" autocomplete="off" step="any" min="0.01">
-                                    </td>
+                                    {# foreign amount #}
+                                    {% if transaction.foreign_amount != null %}
+                                    <div class="col-lg-1 col-md-7 col-sm-12 col-xs-12">
+                                        <div class="input-group">
+                                            <div class="input-group-addon">{{ transaction.foreign_currency_symbol }}</div>
+                                            <input type="number" name="transactions[{{ loop.index0 }}][foreign_amount]"
+                                                   value="{{ transaction.foreign_amount }}"
+                                                   class="form-control" autocomplete="off" step="any">
+                                        </div>
+                                        <input type="hidden"
+                                               name="transactions[{{ loop.index0 }}][foreign_currency_id]"
+                                               value="{{ transaction.foreign_currency_id }}">
 
+                                    </div>
+                                    {% endif %}
+
+                                    {# budget #}
                                     {% if preFilled.what == 'withdrawal' %}
-                                        <td>
+                                        <div class="col-lg-1 col-md-6 col-sm-12 col-xs-12">
                                             <select class="form-control" name="transactions[{{ loop.index0 }}][budget_id]">
                                                 {% for key, budget in budgets %}
                                                     <option label="{{ budget }}" value="{{ key }}"
-                                                            {% if transaction.budget_id == key %}
-                                                                selected="selected"
-                                                            {% endif %}
-                                                    >{{ budget }}</option>
+                                                            {% if transaction.budget_id == key %} selected="selected"{% endif %}>{{ budget }}</option>
                                                 {% endfor %}
                                             </select>
-                                        </td>
+                                        </div>
                                     {% endif %}
-                                    <td>
+
+                                    {# category #}
+                                    <div class="col-lg-2 col-md-6 col-sm-12 col-xs-12">
                                         <input type="text" name="transactions[{{ loop.index0 }}][category]" value="{{ transaction.category }}"
                                                class="form-control"/>
-                                    </td>
-                                </tr>
+                                    </div>
+                                </div>
                             {% endfor %}
-                            </tbody>
-                        </table>
+                        </div>
                         <p>
                             <br/>
                             <a href="#" class="btn btn-default btn-do-split"><i class="fa fa-plus-circle"></i> {{ 'add_another_split'|_ }}</a>
@@ -298,18 +329,26 @@
 
 {% endblock %}
 {% block styles %}
-    <link href="css/bootstrap-tagsinput.css" type="text/css" rel="stylesheet" media="all">
-    <link href="css/jquery-ui/jquery-ui.structure.min.css" type="text/css" rel="stylesheet" media="all">
-    <link href="css/jquery-ui/jquery-ui.theme.min.css" type="text/css" rel="stylesheet" media="all">
+    <link href="css/bootstrap-tagsinput.css?v={{ FF_VERSION }}" type="text/css" rel="stylesheet" media="all">
+    <link href="css/jquery-ui/jquery-ui.structure.min.css?v={{ FF_VERSION }}" type="text/css" rel="stylesheet" media="all">
+    <link href="css/jquery-ui/jquery-ui.theme.min.css?v={{ FF_VERSION }}" type="text/css" rel="stylesheet" media="all">
 {% endblock %}
 {% block scripts %}
+    <script type="text/javascript" src="{{ route('javascript.currencies') }}?ext=.js&amp;v={{ FF_VERSION }}"></script>
     <script type="text/javascript">
+        var currencySymbol = 'x';
+        {% if preFilled.what == 'withdrawal' or preFilled.what == 'transfer' %}
+            currencySymbol = currencyInfo[{{ accountArray[preFilled.journal_source_account_id].currency_id }}].symbol;
+        {% endif %}
+        {% if preFilled.what == 'deposit' %}
+            currencySymbol = currencyInfo[{{ accountArray[preFilled.journal_destination_account_id].currency_id }}].symbol;
+        {% endif %}
         var originalSum = {{ preFilled.journal_amount }};
         var what = "{{ preFilled.what }}";
     </script>
-    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js"></script>
-    <script type="text/javascript" src="js/lib/bootstrap-tagsinput.min.js"></script>
-    <script type="text/javascript" src="js/lib/jquery-ui.min.js"></script>
-    <script type="text/javascript" src="js/lib/modernizr-custom.js"></script>
-    <script type="text/javascript" src="js/ff/transactions/split/edit.js"></script>
+    <script type="text/javascript" src="js/lib/bootstrap3-typeahead.min.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/lib/bootstrap-tagsinput.min.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/lib/jquery-ui.min.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/lib/modernizr-custom.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/ff/transactions/split/edit.js?v={{ FF_VERSION }}"></script>
 {% endblock %}

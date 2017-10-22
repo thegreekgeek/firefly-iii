@@ -1,29 +1,35 @@
 <?php
 /**
  * BalanceReportHelper.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Helpers\Report;
 
 use Carbon\Carbon;
-use DB;
 use FireflyIII\Helpers\Collection\Balance;
 use FireflyIII\Helpers\Collection\BalanceEntry;
 use FireflyIII\Helpers\Collection\BalanceHeader;
 use FireflyIII\Helpers\Collection\BalanceLine;
 use FireflyIII\Models\BudgetLimit;
-use FireflyIII\Models\Tag;
-use FireflyIII\Models\TransactionType;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
-use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Log;
 
@@ -71,17 +77,14 @@ class BalanceReportHelper implements BalanceReportHelperInterface
 
         /** @var BudgetLimit $budgetLimit */
         foreach ($budgetLimits as $budgetLimit) {
-            $line = $this->createBalanceLine($budgetLimit, $accounts);
-            $balance->addBalanceLine($line);
+            if (!is_null($budgetLimit->budget)) {
+                $line = $this->createBalanceLine($budgetLimit, $accounts);
+                $balance->addBalanceLine($line);
+            }
         }
-        Log::debug('Create rest of the things.');
-        $noBudgetLine       = $this->createNoBudgetLine($accounts, $start, $end);
-        $coveredByTagLine   = $this->createTagsBalanceLine($accounts, $start, $end);
-        $leftUnbalancedLine = $this->createLeftUnbalancedLine($noBudgetLine, $coveredByTagLine);
+        $noBudgetLine = $this->createNoBudgetLine($accounts, $start, $end);
 
         $balance->addBalanceLine($noBudgetLine);
-        $balance->addBalanceLine($coveredByTagLine);
-        $balance->addBalanceLine($leftUnbalancedLine);
         $balance->setBalanceHeader($header);
 
         Log::debug('Clear unused budgets.');
@@ -91,54 +94,6 @@ class BalanceReportHelper implements BalanceReportHelperInterface
         Log::debug('Return report.');
 
         return $balance;
-    }
-
-    /**
-     * This method collects all transfers that are part of a "balancing act" tag
-     * and groups the amounts of those transfers by their destination account.
-     *
-     * This is used to indicate which expenses, usually outside of budgets, have been
-     * corrected by transfers from a savings account.
-     *
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return Collection
-     */
-    private function allCoveredByBalancingActs(Collection $accounts, Carbon $start, Carbon $end): Collection
-    {
-        $ids = $accounts->pluck('id')->toArray();
-        $set = auth()->user()->tags()
-                     ->leftJoin('tag_transaction_journal', 'tag_transaction_journal.tag_id', '=', 'tags.id')
-                     ->leftJoin('transaction_journals', 'tag_transaction_journal.transaction_journal_id', '=', 'transaction_journals.id')
-                     ->leftJoin('transaction_types', 'transaction_journals.transaction_type_id', '=', 'transaction_types.id')
-                     ->leftJoin(
-                         'transactions AS t_source', function (JoinClause $join) {
-                         $join->on('transaction_journals.id', '=', 't_source.transaction_journal_id')->where('t_source.amount', '<', 0);
-                     }
-                     )
-                     ->leftJoin(
-                         'transactions AS t_destination', function (JoinClause $join) {
-                         $join->on('transaction_journals.id', '=', 't_destination.transaction_journal_id')->where('t_destination.amount', '>', 0);
-                     }
-                     )
-                     ->where('tags.tagMode', 'balancingAct')
-                     ->where('transaction_types.type', TransactionType::TRANSFER)
-                     ->where('transaction_journals.date', '>=', $start->format('Y-m-d'))
-                     ->where('transaction_journals.date', '<=', $end->format('Y-m-d'))
-                     ->whereNull('transaction_journals.deleted_at')
-                     ->whereIn('t_source.account_id', $ids)
-                     ->whereIn('t_destination.account_id', $ids)
-                     ->groupBy('t_destination.account_id')
-                     ->get(
-                         [
-                             't_destination.account_id',
-                             DB::raw('SUM(t_destination.amount) AS sum'),
-                         ]
-                     );
-
-        return $set;
     }
 
 
@@ -158,7 +113,9 @@ class BalanceReportHelper implements BalanceReportHelperInterface
         foreach ($accounts as $account) {
             $balanceEntry = new BalanceEntry;
             $balanceEntry->setAccount($account);
-            $spent = $this->budgetRepository->spentInPeriod(new Collection([$budgetLimit->budget]), new Collection([$account]), $budgetLimit->start_date, $budgetLimit->end_date);
+            $spent = $this->budgetRepository->spentInPeriod(
+                new Collection([$budgetLimit->budget]), new Collection([$account]), $budgetLimit->start_date, $budgetLimit->end_date
+            );
             $balanceEntry->setSpent($spent);
             $line->addBalanceEntry($balanceEntry);
         }
@@ -166,40 +123,6 @@ class BalanceReportHelper implements BalanceReportHelperInterface
         return $line;
     }
 
-    /**
-     * @param BalanceLine $noBudgetLine
-     * @param BalanceLine $coveredByTagLine
-     *
-     * @return BalanceLine
-     */
-    private function createLeftUnbalancedLine(BalanceLine $noBudgetLine, BalanceLine $coveredByTagLine): BalanceLine
-    {
-        $line = new BalanceLine;
-        $line->setRole(BalanceLine::ROLE_DIFFROLE);
-        $noBudgetEntries = $noBudgetLine->getBalanceEntries();
-        $tagEntries      = $coveredByTagLine->getBalanceEntries();
-
-        foreach ($noBudgetEntries as $entry) {
-            $account  = $entry->getAccount();
-            $tagEntry = $tagEntries->filter(
-                function (BalanceEntry $current) use ($account) {
-                    return $current->getAccount()->id === $account->id;
-                }
-            );
-            if ($tagEntry->first()) {
-                // found corresponding entry. As we should:
-                $newEntry = new BalanceEntry;
-                $newEntry->setAccount($account);
-                $spent = bcadd($tagEntry->first()->getLeft(), $entry->getSpent());
-                $newEntry->setSpent($spent);
-                $line->addBalanceEntry($newEntry);
-            }
-        }
-
-        return $line;
-
-
-    }
 
     /**
      * @param Collection $accounts
@@ -225,41 +148,6 @@ class BalanceReportHelper implements BalanceReportHelperInterface
         return $empty;
     }
 
-    /**
-     * @param Collection $accounts
-     * @param Carbon     $start
-     * @param Carbon     $end
-     *
-     * @return BalanceLine
-     */
-    private function createTagsBalanceLine(Collection $accounts, Carbon $start, Carbon $end): BalanceLine
-    {
-        $tags     = new BalanceLine;
-        $tagsLeft = $this->allCoveredByBalancingActs($accounts, $start, $end);
-
-        $tags->setRole(BalanceLine::ROLE_TAGROLE);
-
-        foreach ($accounts as $account) {
-            $leftEntry = $tagsLeft->filter(
-                function (Tag $tag) use ($account) {
-                    return $tag->account_id == $account->id;
-                }
-            );
-            $left      = '0';
-            if (!is_null($leftEntry->first())) {
-                $left = $leftEntry->first()->sum;
-            }
-
-            // balanced by tags
-            $tagEntry = new BalanceEntry;
-            $tagEntry->setAccount($account);
-            $tagEntry->setLeft($left);
-            $tags->addBalanceEntry($tagEntry);
-
-        }
-
-        return $tags;
-    }
 
     /**
      * @param Balance $balance

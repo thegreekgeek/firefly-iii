@@ -1,18 +1,29 @@
 <?php
 /**
  * SearchInterface.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support\Search;
 
+use FireflyIII\User;
 use Illuminate\Support\Collection;
 
 /**
@@ -23,38 +34,33 @@ use Illuminate\Support\Collection;
 interface SearchInterface
 {
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @return string
      */
-    public function searchAccounts(array $words): Collection;
+    public function getWordsAsString(): string;
 
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @return bool
      */
-    public function searchBudgets(array $words): Collection;
+    public function hasModifiers(): bool;
 
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @param string $query
      */
-    public function searchCategories(array $words): Collection;
+    public function parseQuery(string $query);
+
 
     /**
-     *
-     * @param array $words
-     *
      * @return Collection
      */
-    public function searchTags(array $words): Collection;
+    public function searchTransactions(): Collection;
 
     /**
-     * @param array $words
-     *
-     * @return Collection
+     * @param int $limit
      */
-    public function searchTransactions(array $words): Collection;
+    public function setLimit(int $limit);
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user);
 }

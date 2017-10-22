@@ -1,19 +1,29 @@
 <?php
 /**
  * Entry.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Export\Entry;
 
-use Crypt;
+use FireflyIII\Models\Transaction;
 
 /**
  * To extend the exported object, in case of new features in Firefly III for example,
@@ -30,6 +40,7 @@ use Crypt;
  *
  * Class Entry
  * @SuppressWarnings(PHPMD.LongVariable)
+ * @SuppressWarnings(PHPMD.TooManyFields)
  *
  * @package FireflyIII\Export\Entry
  */
@@ -37,24 +48,43 @@ final class Entry
 {
     // @formatter:off
     public $journal_id;
+    public $transaction_id = 0;
+
     public $date;
     public $description;
 
     public $currency_code;
     public $amount;
+    public $foreign_currency_code = '';
+    public $foreign_amount        = '0';
 
     public $transaction_type;
 
-    public $source_account_id;
-    public $source_account_name;
+    public $asset_account_id;
+    public $asset_account_name;
+    public $asset_account_iban;
+    public $asset_account_bic;
+    public $asset_account_number;
+    public $asset_currency_code;
 
-    public $destination_account_id;
-    public $destination_account_name;
+    public $opposing_account_id;
+    public $opposing_account_name;
+    public $opposing_account_iban;
+    public $opposing_account_bic;
+    public $opposing_account_number;
+    public $opposing_currency_code;
 
     public $budget_id;
     public $budget_name;
+
     public $category_id;
     public $category_name;
+
+    public $bill_id;
+    public $bill_name;
+
+    public $notes;
+    public $tags;
     // @formatter:on
 
     /**
@@ -65,49 +95,77 @@ final class Entry
     }
 
     /**
-     * @param $object
+     * Converts a given transaction (as collected by the collector) into an export entry.
+     *
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity) // complex but little choice.
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength) // cannot be helped
+     *
+     * @param Transaction $transaction
      *
      * @return Entry
      */
-    public static function fromObject($object): Entry
+    public static function fromTransaction(Transaction $transaction): Entry
     {
-        $entry                           = new self;
-        $entry->journal_id               = $object->transaction_journal_id;
-        $entry->description              = self::decrypt(intval($object->journal_encrypted), $object->journal_description);
-        $entry->amount                   = $object->amount;
-        $entry->date                     = $object->date;
-        $entry->transaction_type         = $object->transaction_type;
-        $entry->currency_code            = $object->transaction_currency_code;
-        $entry->source_account_id        = $object->account_id;
-        $entry->source_account_name      = self::decrypt(intval($object->account_name_encrypted), $object->account_name);
-        $entry->destination_account_id   = $object->opposing_account_id;
-        $entry->destination_account_name = self::decrypt(intval($object->opposing_account_encrypted), $object->opposing_account_name);
-        $entry->category_id              = $object->category_id ?? '';
-        $entry->category_name            = $object->category_name ?? '';
-        $entry->budget_id                = $object->budget_id ?? '';
-        $entry->budget_name              = $object->budget_name ?? '';
-
-        // update description when transaction description is different:
-        if (!is_null($object->description) && $object->description != $entry->description) {
-            $entry->description = $entry->description . ' (' . $object->description . ')';
+        $entry                 = new self;
+        $entry->journal_id     = $transaction->journal_id;
+        $entry->transaction_id = $transaction->id;
+        $entry->date           = $transaction->date->format('Ymd');
+        $entry->description    = $transaction->description;
+        if (strlen(strval($transaction->transaction_description)) > 0) {
+            $entry->description = $transaction->transaction_description . '(' . $transaction->description . ')';
         }
+        $entry->currency_code = $transaction->transactionCurrency->code;
+        $entry->amount        = round($transaction->transaction_amount, $transaction->transactionCurrency->decimal_places);
+
+        $entry->foreign_currency_code = is_null($transaction->foreign_currency_id) ? null : $transaction->foreignCurrency->code;
+        $entry->foreign_amount        = is_null($transaction->foreign_currency_id)
+            ? null
+            : strval(
+                round(
+                    $transaction->transaction_foreign_amount, $transaction->foreignCurrency->decimal_places
+                )
+            );
+
+        $entry->transaction_type     = $transaction->transaction_type_type;
+        $entry->asset_account_id     = $transaction->account_id;
+        $entry->asset_account_name   = app('steam')->tryDecrypt($transaction->account_name);
+        $entry->asset_account_iban   = $transaction->account_iban;
+        $entry->asset_account_number = $transaction->account_number;
+        $entry->asset_account_bic    = $transaction->account_bic;
+        $entry->asset_currency_code  = $transaction->account_currency_code;
+
+        $entry->opposing_account_id     = $transaction->opposing_account_id;
+        $entry->opposing_account_name   = app('steam')->tryDecrypt($transaction->opposing_account_name);
+        $entry->opposing_account_iban   = $transaction->opposing_account_iban;
+        $entry->opposing_account_number = $transaction->opposing_account_number;
+        $entry->opposing_account_bic    = $transaction->opposing_account_bic;
+        $entry->opposing_currency_code  = $transaction->opposing_currency_code;
+
+        /** budget */
+        $entry->budget_id   = $transaction->transaction_budget_id;
+        $entry->budget_name = app('steam')->tryDecrypt($transaction->transaction_budget_name);
+        if (is_null($transaction->transaction_budget_id)) {
+            $entry->budget_id   = $transaction->transaction_journal_budget_id;
+            $entry->budget_name = app('steam')->tryDecrypt($transaction->transaction_journal_budget_name);
+        }
+
+        /** category */
+        $entry->category_id   = $transaction->transaction_category_id;
+        $entry->category_name = app('steam')->tryDecrypt($transaction->transaction_category_name);
+        if (is_null($transaction->transaction_category_id)) {
+            $entry->category_id   = $transaction->transaction_journal_category_id;
+            $entry->category_name = app('steam')->tryDecrypt($transaction->transaction_journal_category_name);
+        }
+
+        /** budget */
+        $entry->bill_id   = $transaction->bill_id;
+        $entry->bill_name = app('steam')->tryDecrypt($transaction->bill_name);
+
+        $entry->tags  = $transaction->tags;
+        $entry->notes = $transaction->notes;
 
         return $entry;
     }
 
-    /**
-     * @param int $isEncrypted
-     * @param     $value
-     *
-     * @return string
-     */
-    protected static function decrypt(int $isEncrypted, $value)
-    {
-        if ($isEncrypted === 1) {
-            return Crypt::decrypt($value);
-        }
-
-        return $value;
-    }
 
 }

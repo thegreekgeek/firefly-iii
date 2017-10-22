@@ -1,42 +1,31 @@
 /*
  * index.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/** global: Tour, showTour, accountFrontpageUri, billCount, accountExpenseUri, accountRevenueUri */
+/** global: accountFrontpageUri, token, billCount, accountExpenseUri, accountRevenueUri */
 
 $(function () {
     "use strict";
     // do chart JS stuff.
     drawChart();
-    if (showTour == true) {
-        $.getJSON('json/tour').done(function (data) {
-            var tour = new Tour(
-                {
-                    steps: data.steps,
-                    template: data.template,
-                    onEnd: endTheTour
-                });
-            // Initialize the tour
-            tour.init();
-            // Start the tour
-            tour.start();
-        });
-    }
-
 
 });
-
-function endTheTour() {
-    "use strict";
-    $.post('json/end-tour');
-
-}
 
 function drawChart() {
     "use strict";
@@ -49,9 +38,61 @@ function drawChart() {
     columnChart(accountExpenseUri, 'expense-accounts-chart');
     columnChart(accountRevenueUri, 'revenue-accounts-chart');
 
+    // get balance box:
+    getBalanceBox();
+    getBillsBox();
+    getAvailableBox();
+    getNetWorthBox();
 
-    getBoxAmounts();
+    //getBoxAmounts();
 }
+
+function getNetWorthBox() {
+    // box-net-worth
+    $.getJSON('json/box/net-worth').done(function(data) {
+        $('#box-net-worth').html(data.net_worth);
+    });
+}
+
+/**
+ *
+ */
+function getAvailableBox() {
+    // box-left-to-spend
+    // box-left-per-day
+    $.getJSON('json/box/available').done(function(data) {
+        $('#box-left-to-spend').html(data.left);
+        $('#box-left-per-day').html(data.perDay);
+    });
+}
+
+/**
+ *
+ */
+function getBillsBox() {
+    // box-bills-unpaid
+    // box-bills-paid
+    $.getJSON('json/box/bills').done(function(data) {
+        $('#box-bills-paid').html(data.paid);
+        $('#box-bills-unpaid').html(data.unpaid);
+    });
+}
+
+/**
+ *
+ */
+function getBalanceBox() {
+    // box-balance-total
+    // box-balance-out
+    // box-balance-in
+    $.getJSON('json/box/balance').done(function(data) {
+        $('#box-balance-total').html(data.combined);
+        $('#box-balance-in').html(data.income);
+        $('#box-balance-out').html(data.expense);
+    });
+}
+
+
 
 function getBoxAmounts() {
     "use strict";

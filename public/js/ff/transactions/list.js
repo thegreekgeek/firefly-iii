@@ -1,11 +1,21 @@
 /*
  * list.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /** global: edit_selected_txt, delete_selected_txt */
@@ -41,7 +51,14 @@ function goToMassEdit() {
     var checkedArray = getCheckboxes();
 
     // go to specially crafted URL:
-    window.location.href = 'transactions/mass/edit/' + checkedArray;
+    var bases = document.getElementsByTagName('base');
+    var baseHref = null;
+
+    if (bases.length > 0) {
+        baseHref = bases[0].href;
+    }
+
+    window.location.href = baseHref + '/transactions/mass/edit/' + checkedArray;
     return false;
 }
 
@@ -50,7 +67,13 @@ function goToMassDelete() {
     var checkedArray = getCheckboxes();
 
     // go to specially crafted URL:
-    window.location.href = 'transactions/mass/delete/' + checkedArray;
+    var bases = document.getElementsByTagName('base');
+    var baseHref = null;
+
+    if (bases.length > 0) {
+        baseHref = bases[0].href;
+    }
+    window.location.href = baseHref + '/transactions/mass/delete/' + checkedArray;
     return false;
 }
 
@@ -72,8 +95,8 @@ function countChecked() {
     "use strict";
     var checked = $('.select_all_single:checked').length;
     if (checked > 0) {
-        $('.mass_edit span').text(edit_selected_txt + ' (' + checked + ')')
-        $('.mass_delete span').text(delete_selected_txt + ' (' + checked + ')')
+        $('.mass_edit span').text(edit_selected_txt + ' (' + checked + ')');
+        $('.mass_delete span').text(delete_selected_txt + ' (' + checked + ')');
         $('.mass_button_options').show();
 
     } else {
@@ -86,6 +109,7 @@ function checkAll() {
     "use strict";
     $('.select_all_single').prop('checked', true);
 }
+
 function uncheckAll() {
     "use strict";
     $('.select_all_single').prop('checked', false);

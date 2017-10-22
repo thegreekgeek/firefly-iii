@@ -3,102 +3,100 @@
     <tr>
         <th data-defaultsign="az">{{ 'budget'|_ }}</th>
         <th data-defaultsign="month" class="hidden-xs">{{ 'date'|_ }}</th>
-        <th data-defaultsign="_19" style="text-align: right;">{{ 'budgeted'|_ }}</th>
+        <th data-defaultsign="_19" style="text-align: right;" class="hidden-xs">{{ 'budgeted'|_ }}</th>
         <th data-defaultsign="_19" style="text-align: right;">{{ 'spent'|_ }}</th>
-        <th data-defaultsort="disabled">&nbsp;</th>
-        <th data-defaultsign="_19" style="text-align: right;">{{ 'left'|_ }}</th>
+        <th data-defaultsort="disabled" class="hidden-xs">&nbsp;</th>
+        <th data-defaultsign="_19" style="text-align: right;" class="hidden-xs">{{ 'left'|_ }}</th>
         <th data-defaultsign="_19" style="text-align: right;">{{ 'overspent'|_ }}</th>
     </tr>
     </thead>
     <tbody>
-    {% for budgetLine in budgets.getBudgetLines %}
-        <tr>
+    {% set sum_budgeted = 0 %}
+    {% set sum_spent = 0 %}
+    {% set sum_left = 0 %}
+    {% set sum_overspent = 0 %}
+    {% for line in budgets %}
 
-            {% if budgetLine.getBudget.id %}
-                <td data-value="{{ budgetLine.getBudget.name }}">
-                    <a href="{{ route('budgets.show',budgetLine.getBudget.id) }}">{{ budgetLine.getBudget.name }}</a>
-                </td>
-            {% else %}
+        {% set sum_budgeted = sum_budgeted + line.budgeted %}
+        {% set sum_spent = sum_spent + line.spent %}
+        {% set sum_left = sum_left + line.left %}
+        {% set sum_overspent = sum_overspent + line.overspent %}
+
+        <tr>
+            {# Budget name, always visible #}
+            {% if line.type == 'no-budget' %}
                 <td data-value="zzzzzzz">
                     <em>{{ 'no_budget'|_ }}</em>
                 </td>
+            {% else %}
+                <td data-value="{{ line.name }}">
+                    <a href="{{ route('budgets.show',line.id) }}">{{ line.name }}</a>
+                </td>
             {% endif %}
-
-
-            {% if budgetLine.getBudgetLimit.id %}
-                <td class="hidden-xs" data-value="{{ budgetLine.getBudgetLimit.start_date.format('Y-m-d') }}">
-                    <a href="{{ route('budgets.show.limit', [budgetLine.getBudget.id, budgetLine.getBudgetLimit.id]) }}">
-                        {{ budgetLine.getBudgetLimit.start_date.formatLocalized(monthAndDayFormat) }}
+            {# date, hidden on mobile #}
+            {% if line.type == 'budget-line' %}
+                <td class="hidden-xs" data-value="{{ line.start.format('Y-m-d') }}">
+                    <a href="{{ route('budgets.show.limit', [line.id, line.limit]) }}">
+                        {{ line.start.formatLocalized(monthAndDayFormat) }}
                         &mdash;
-                        {{ budgetLine.getBudgetLimit.end_date.formatLocalized(monthAndDayFormat) }}
+                        {{ line.end.formatLocalized(monthAndDayFormat) }}
                     </a>
                 </td>
             {% else %}
-                <td data-value="0000-00-00">
+                <td data-value="0000-00-00" class="hidden-xs">
 
                 </td>
             {% endif %}
 
-
-            {% if budgetLine.getBudgetLimit.id %}
-                <td data-value="{{ budgetLine.getBudgetLimit.amount }}" style="text-align: right;">
-                    {{ budgetLine.getBudgetLimit.amount|formatAmount }}
-                </td>
-            {% else %}
-                <td data-value="0" style="text-align: right;">
-                    {{ 0|formatAmount }}
-                </td>
-            {% endif %}
-
-            <td data-value="{{ budgetLine.getSpent }}" style="text-align: right;">
-                {% if budgetLine.getSpent != 0 %}
-                    {{ budgetLine.getSpent|formatAmount }}
-                    <!-- <i class="fa fa-fw text-muted fa-info-circle firefly-info-button"
-                       data-location="budget-spent-amount" data-budget-id="{{ budgetLine.getBudget.id }}"></i>
-                       -->
-                {% endif %}
-
-                {% if budgetLine.getSpent == 0 %}
-                    {{ budgetLine.getSpent|formatAmount }}
-                {% endif %}
+            {# budgeted, hidden on mobile #}
+            <td data-value="{{ line.budgeted }}" style="text-align: right;" class="hidden-xs">
+                {{ line.budgeted|formatAmount }}
             </td>
-            <td>
-                {% if budgetLine.getSpent != 0 %}
+
+            {# spent, visible on mobile #}
+            <td data-value="{{ line.spent }}" style="text-align: right;">
+                {{ line.spent|formatAmount }}
+            </td>
+
+            {# info button, not visible on mobile #}
+            <td class="hidden-xs">
+                {% if line.spent != 0 %}
                     <i class="fa fa-fw text-muted fa-info-circle firefly-info-button"
-                       data-location="budget-spent-amount" data-budget-id="{{ budgetLine.getBudget.id }}"></i>
-
+                       data-location="budget-spent-amount" data-budget-id="{{ line.id }}"></i>
                 {% endif %}
             </td>
 
-            <td data-value="{{ budgetLine.getLeft }}" style="text-align: right;">
-                {% if(budgetLine.getOverspent == 0) %}
-                    {{ budgetLine.getLeft|formatAmount }}
-                {% endif %}
+            {# left, hidden on mobile #}
+            <td data-value="{{ line.left }}" style="text-align: right;" class="hidden-xs">
+                {{ line.left|formatAmount }}
             </td>
-            <td data-value="{{ budgetLine.getOverspent }}" style="text-align: right;">
-                {% if budgetLine.getOverspent != 0 %}
-                    {{ budgetLine.getOverspent|formatAmount }}
-                {% endif %}
+
+            {# overspent, visible. #}
+            <td data-value="{{ line.overspent }}" style="text-align: right;">
+                {{ line.overspent|formatAmount }}
             </td>
         </tr>
     {% endfor %}
     </tbody>
     <tfoot>
     <tr>
+        {# title, visible #}
         <td><em>{{ 'sum'|_ }}</em></td>
+        {# date, hidden #}
         <td class="hidden-xs">&nbsp;</td>
-        <td style="text-align: right;">{{ budgets.getBudgeted|formatAmount }}</td>
-        <td style="text-align: right;">
-            {% if budgets.getSpent != 0 %}
-                <span class="text-danger">{{ budgets.getSpent|formatAmountPlain }}</span>
-            {% endif %}
-            {% if budgets.getSpent == 0 %}
-                {{ budgets.getSpent|formatAmount }}
-            {% endif %}
-        </td>
-        <td>&nbsp;</td>
-        <td style="text-align: right;">{{ budgets.getLeft|formatAmount }}</td>
-        <td style="text-align: right;"><span class="text-danger">{{ budgets.getOverspent|formatAmountPlain }}</span></td>
+
+        {# sum of budgeted, hidden #}
+        <td style="text-align: right;" class="hidden-xs">{{ sum_budgeted|formatAmount }}</td>
+
+        {# spent, visible #}
+        <td style="text-align: right;">{{ sum_spent|formatAmount }}</td>
+
+        {# info button, hidden #}
+        <td class="hidden-xs">&nbsp;</td>
+
+        {# left, hidden #}
+        <td style="text-align: right;" class="hidden-xs">{{ sum_left|formatAmount }}</td>
+        <td style="text-align: right;">{{ sum_overspent|formatAmount }}</td>
     </tr>
     </tfoot>
 </table>

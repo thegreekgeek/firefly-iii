@@ -1,20 +1,32 @@
 <?php
 /**
  * SearchController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
 use FireflyIII\Support\Search\SearchInterface;
 use Illuminate\Http\Request;
+use Response;
+use View;
 
 /**
  * Class SearchController
@@ -30,44 +42,48 @@ class SearchController extends Controller
     {
         parent::__construct();
 
+        $this->middleware(
+            function ($request, $next) {
+                View::share('mainTitleIcon', 'fa-search');
+                View::share('title', trans('firefly.search'));
+
+                return $next($request);
+            }
+        );
+
     }
 
     /**
-     * Results always come in the form of an array [results, count, fullCount]
-     *
      * @param Request         $request
      * @param SearchInterface $searcher
      *
-     * @return $this
+     * @return View
      */
     public function index(Request $request, SearchInterface $searcher)
     {
-        $minSearchLen  = 1;
-        $subTitle      = null;
-        $query         = null;
-        $result        = [];
-        $title         = trans('firefly.search');
-        $limit         = 20;
-        $mainTitleIcon = 'fa-search';
+        $fullQuery = strval($request->get('q'));
 
-        // set limit for search:
-        $searcher->setLimit($limit);
+        // parse search terms:
+        $searcher->parseQuery($fullQuery);
+        $query    = $searcher->getWordsAsString();
+        $subTitle = trans('breadcrumbs.search_result', ['query' => $query]);
 
-        if (!is_null($request->get('q')) && strlen($request->get('q')) >= $minSearchLen) {
-            $query    = trim(strtolower($request->get('q')));
-            $words    = explode(' ', $query);
-            $subTitle = trans('firefly.search_results_for', ['query' => $query]);
+        return view('search.index', compact('query', 'fullQuery', 'subTitle'));
+    }
 
-            $transactions = $searcher->searchTransactions($words);
-            $accounts     = $searcher->searchAccounts($words);
-            $categories   = $searcher->searchCategories($words);
-            $budgets      = $searcher->searchBudgets($words);
-            $tags         = $searcher->searchTags($words);
-            $result       = ['transactions' => $transactions, 'accounts' => $accounts, 'categories' => $categories, 'budgets' => $budgets, 'tags' => $tags];
+    public function search(Request $request, SearchInterface $searcher)
+    {
+        $fullQuery = strval($request->get('query'));
 
-        }
+        // parse search terms:
+        $searcher->parseQuery($fullQuery);
+        $searcher->setLimit(20);
+        $transactions = $searcher->searchTransactions();
+        $html         = view('search.search', compact('transactions'))->render();
 
-        return view('search.index', compact('title', 'subTitle', 'limit', 'mainTitleIcon', 'query', 'result'));
+        return Response::json(['count' => $transactions->count(), 'html' => $html]);
+
+
     }
 
 }

@@ -1,15 +1,25 @@
 <?php
 /**
  * ExpandedForm.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Support;
 
@@ -262,6 +272,66 @@ class ExpandedForm
     }
 
     /**
+     * @param string $name
+     * @param null   $value
+     * @param array  $options
+     *
+     * @return string
+     */
+    public function nonSelectableAmount(string $name, $value = null, array $options = []): string
+    {
+        $label            = $this->label($name, $options);
+        $options          = $this->expandOptionArray($name, $label, $options);
+        $classes          = $this->getHolderClasses($name);
+        $value            = $this->fillFieldValue($name, $value);
+        $options['step']  = 'any';
+        $selectedCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
+        unset($options['currency']);
+        unset($options['placeholder']);
+
+        // make sure value is formatted nicely:
+        if (!is_null($value) && $value !== '') {
+            $value = round($value, $selectedCurrency->decimal_places);
+        }
+
+
+        $html = view('form.non-selectable-amount', compact('selectedCurrency', 'classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
+    }
+
+
+    /**
+     * @param string $name
+     * @param null   $value
+     * @param array  $options
+     *
+     * @return string
+     */
+    public function nonSelectableBalance(string $name, $value = null, array $options = []): string
+    {
+        $label            = $this->label($name, $options);
+        $options          = $this->expandOptionArray($name, $label, $options);
+        $classes          = $this->getHolderClasses($name);
+        $value            = $this->fillFieldValue($name, $value);
+        $options['step']  = 'any';
+        $selectedCurrency = isset($options['currency']) ? $options['currency'] : Amt::getDefaultCurrency();
+        unset($options['currency']);
+        unset($options['placeholder']);
+
+        // make sure value is formatted nicely:
+        if (!is_null($value) && $value !== '') {
+            $decimals = $selectedCurrency->decimal_places ?? 2;
+            $value    = round($value, $decimals);
+        }
+
+
+        $html = view('form.non-selectable-amount', compact('selectedCurrency', 'classes', 'name', 'label', 'value', 'options'))->render();
+
+        return $html;
+    }
+
+    /**
      * @param $type
      * @param $name
      *
@@ -272,7 +342,7 @@ class ExpandedForm
         $previousValue = null;
 
         try {
-            $previousValue = Input::old('post_submit_action');
+            $previousValue = request()->old('post_submit_action');
         } catch (RuntimeException $e) {
             // don't care
         }
@@ -428,8 +498,8 @@ class ExpandedForm
             $value     = isset($preFilled[$name]) && is_null($value) ? $preFilled[$name] : $value;
         }
         try {
-            if (!is_null(Input::old($name))) {
-                $value = Input::old($name);
+            if (!is_null(request()->old($name))) {
+                $value = request()->old($name);
             }
         } catch (RuntimeException $e) {
             // don't care about session errors.
@@ -499,6 +569,19 @@ class ExpandedForm
         $currencies      = Amt::getAllCurrencies();
         unset($options['currency']);
         unset($options['placeholder']);
+
+        // perhaps the currency has been sent to us in the field $amount_currency_id_$name (amount_currency_id_amount)
+        $preFilled      = session('preFilled');
+        $key            = 'amount_currency_id_' . $name;
+        $sentCurrencyId = isset($preFilled[$key]) ? intval($preFilled[$key]) : $defaultCurrency->id;
+
+        // find this currency in set of currencies:
+        foreach ($currencies as $currency) {
+            if ($currency->id === $sentCurrencyId) {
+                $defaultCurrency = $currency;
+                break;
+            }
+        }
 
         // make sure value is formatted nicely:
         if (!is_null($value) && $value !== '') {

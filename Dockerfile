@@ -11,36 +11,43 @@ RUN apt-get update -y && \
                                                libtidy-dev \
                                                libxml2-dev \
                                                libsqlite3-dev \
+                                               libpq-dev \
                                                libbz2-dev \
+                                               gettext-base \
                                                locales && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN docker-php-ext-install -j$(nproc) curl gd intl json mcrypt readline tidy zip bcmath xml mbstring pdo_sqlite pdo_mysql bz2
+RUN docker-php-ext-install -j$(nproc) curl gd intl json mcrypt readline tidy zip bcmath xml mbstring pdo_sqlite pdo_mysql bz2 pdo_pgsql
 
 # Generate locales supported by firefly
 RUN echo "en_US.UTF-8 UTF-8\nde_DE.UTF-8 UTF-8\nnl_NL.UTF-8 UTF-8\npt_BR.UTF-8 UTF-8" > /etc/locale.gen && locale-gen
 
+COPY ./docker/apache2.conf /etc/apache2/apache2.conf
+
 # Enable apache mod rewrite..
 RUN a2enmod rewrite
 
+# Enable apache mod ssl..
+RUN a2enmod ssl
+
 # Setup the Composer installer
-RUN curl -o /tmp/composer-setup.php https://getcomposer.org/installer && \
-  curl -o /tmp/composer-setup.sig https://composer.github.io/installer.sig && \
-  php -r "if (hash('SHA384', file_get_contents('/tmp/composer-setup.php')) !== trim(file_get_contents('/tmp/composer-setup.sig'))) { unlink('/tmp/composer-setup.php'); echo 'Invalid installer' . PHP_EOL; exit(1); }" && \
-  chmod +x /tmp/composer-setup.php && \
-  php /tmp/composer-setup.php && \
-  mv composer.phar /usr/local/bin/composer && \
-  rm -f /tmp/composer-setup.{php,sig}
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-ADD . /var/www/firefly-iii
-RUN chown -R www-data:www-data /var/www/
-ADD docker/apache-firefly.conf /etc/apache2/sites-available/000-default.conf
+# Copy Apache Configs
+COPY ./docker/apache-firefly.conf /etc/apache2/sites-available/000-default.conf
 
-USER www-data
+ENV FIREFLY_PATH /var/www/firefly-iii
 
-WORKDIR /var/www/firefly-iii
+WORKDIR $FIREFLY_PATH
 
-RUN composer install --no-scripts --no-dev
+# The working directory
+COPY . $FIREFLY_PATH
 
-USER root
+RUN chown -R www-data:www-data /var/www && chmod -R 775 $FIREFLY_PATH/storage
+
+RUN composer install --prefer-dist --no-dev --no-scripts
+
+EXPOSE 80
+
+ENTRYPOINT ["docker/entrypoint.sh"]

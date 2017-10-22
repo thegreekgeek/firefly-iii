@@ -1,11 +1,21 @@
 /*
  * create-edit.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /** global: triggerCount, actionCount */
@@ -104,14 +114,14 @@ function addNewAction() {
 function removeTrigger(e) {
     "use strict";
     var target = $(e.target);
-    if (target.prop("tagName") == "I") {
+    if (target.prop("tagName") === "I") {
         target = target.parent();
     }
     // remove grand parent:
     target.parent().parent().remove();
 
     // if now at zero, immediatly add one again:
-    if ($('.rule-trigger-tbody tr').length == 0) {
+    if ($('.rule-trigger-tbody tr').length === 0) {
         addNewTrigger();
     }
     return false;
@@ -125,14 +135,14 @@ function removeTrigger(e) {
 function removeAction(e) {
     "use strict";
     var target = $(e.target);
-    if (target.prop("tagName") == "I") {
+    if (target.prop("tagName") === "I") {
         target = target.parent();
     }
     // remove grand parent:
     target.parent().parent().remove();
 
     // if now at zero, immediatly add one again:
-    if ($('.rule-action-tbody tr').length == 0) {
+    if ($('.rule-action-tbody tr').length === 0) {
         addNewAction();
     }
     return false;
@@ -194,6 +204,7 @@ function updateActionInput(selectList) {
             break;
         case 'clear_category':
         case 'clear_budget':
+        case 'clear_notes':
         case 'remove_all_tags':
             input.attr('disabled', 'disabled');
             break;
@@ -229,6 +240,7 @@ function updateTriggerInput(selectList) {
     var parent = selectList.parent().parent();
     // the text input we're looking for:
     var input = parent.find('input[name^="rule-trigger-value["]');
+    input.prop('disabled', false);
     switch (selectList.val()) {
         case 'from_account_starts':
         case 'from_account_ends':
@@ -258,6 +270,17 @@ function updateTriggerInput(selectList) {
         case 'description_contains':
         case 'description_is':
             createAutoComplete(input, 'json/transaction-journals/all');
+            break;
+        case 'has_no_category':
+        case 'has_any_category':
+        case 'has_no_budget':
+        case 'has_any_budget':
+        case 'has_no_tag':
+        case 'no_notes':
+        case 'any_notes':
+        case 'has_any_tag':
+            input.prop('disabled', true);
+            input.typeahead('destroy');
             break;
         default:
             input.typeahead('destroy');
@@ -300,7 +323,7 @@ function testRuleTriggers() {
         }
 
         // Show the modal dialog
-        $("#testTriggerModal").modal();
+        modal.modal();
     }).fail(function () {
         alert('Cannot get transactions for given triggers.');
     });

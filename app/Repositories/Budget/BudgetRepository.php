@@ -1,20 +1,32 @@
 <?php
 /**
  * BudgetRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Budget;
 
 use Carbon\Carbon;
+use DB;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Models\AccountType;
 use FireflyIII\Models\AvailableBudget;
 use FireflyIII\Models\Budget;
 use FireflyIII\Models\BudgetLimit;
@@ -22,6 +34,7 @@ use FireflyIII\Models\Transaction;
 use FireflyIII\Models\TransactionCurrency;
 use FireflyIII\Models\TransactionJournal;
 use FireflyIII\Models\TransactionType;
+use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -39,16 +52,6 @@ class BudgetRepository implements BudgetRepositoryInterface
     private $user;
 
     /**
-     * BudgetRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
-
-    /**
      * @return bool
      */
     public function cleanupBudgets(): bool
@@ -56,8 +59,66 @@ class BudgetRepository implements BudgetRepositoryInterface
         // delete limits with amount 0:
         BudgetLimit::where('amount', 0)->delete();
 
+        // clean up:
+        $set = BudgetLimit::groupBy(['budget_id', 'start_date', 'end_date'])
+                          ->get(['budget_id', 'start_date', 'end_date', DB::raw('COUNT(*) as ct')]);
+        foreach ($set as $entry) {
+            if ($entry->ct > 1) {
+                $newest = BudgetLimit::where('start_date', $entry->start_date)->where('end_date', $entry->end_date)
+                                     ->where('budget_id', $entry->budget_id)->orderBy('updated_at', 'DESC')->first(['budget_limits.*']);
+                BudgetLimit::where('start_date', $entry->start_date)->where('end_date', $entry->end_date)
+                           ->where('budget_id', $entry->budget_id)->where('id', '!=', $newest->id)->delete();
+            }
+        }
+
         return true;
 
+    }
+
+    /**
+     * This method collects various info on budgets, used on the budget page and on the index.
+     *
+     * @param Collection $budgets
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     */
+    public function collectBudgetInformation(Collection $budgets, Carbon $start, Carbon $end): array
+    {
+        // get account information
+        /** @var AccountRepositoryInterface $accountRepository */
+        $accountRepository = app(AccountRepositoryInterface::class);
+        $accounts          = $accountRepository->getAccountsByType([AccountType::DEFAULT, AccountType::ASSET, AccountType::CASH]);
+        $return            = [];
+        /** @var Budget $budget */
+        foreach ($budgets as $budget) {
+            $budgetId          = $budget->id;
+            $return[$budgetId] = [
+                'spent'      => $this->spentInPeriod(new Collection([$budget]), $accounts, $start, $end),
+                'budgeted'   => '0',
+                'currentRep' => false,
+            ];
+            $budgetLimits      = $this->getBudgetLimits($budget, $start, $end);
+            $otherLimits       = new Collection;
+
+            // get all the budget limits relevant between start and end and examine them:
+            /** @var BudgetLimit $limit */
+            foreach ($budgetLimits as $limit) {
+                if ($limit->start_date->isSameDay($start) && $limit->end_date->isSameDay($end)
+                ) {
+                    $return[$budgetId]['currentLimit'] = $limit;
+                    $return[$budgetId]['budgeted']     = $limit->amount;
+                    continue;
+                }
+                // otherwise it's just one of the many relevant repetitions:
+                $otherLimits->push($limit);
+            }
+            $return[$budgetId]['otherLimits'] = $otherLimits;
+        }
+
+        return $return;
     }
 
     /**
@@ -434,6 +495,14 @@ class BudgetRepository implements BudgetRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param Collection $budgets
      * @param Collection $accounts
      * @param Carbon     $start
@@ -444,8 +513,9 @@ class BudgetRepository implements BudgetRepositoryInterface
     public function spentInPeriod(Collection $budgets, Collection $accounts, Carbon $start, Carbon $end): string
     {
         /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [$this->user]);
-        $collector->setRange($start, $end)->setTypes([TransactionType::WITHDRAWAL])->setBudgets($budgets);
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setUser($this->user);
+        $collector->setRange($start, $end)->setBudgets($budgets)->withBudgetInformation();
 
         if ($accounts->count() > 0) {
             $collector->setAccounts($accounts);
@@ -470,7 +540,8 @@ class BudgetRepository implements BudgetRepositoryInterface
     public function spentInPeriodWoBudget(Collection $accounts, Carbon $start, Carbon $end): string
     {
         /** @var JournalCollectorInterface $collector */
-        $collector = app(JournalCollectorInterface::class, [$this->user]);
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setUser($this->user);
         $collector->setRange($start, $end)->setTypes([TransactionType::WITHDRAWAL])->withoutBudget();
 
         if ($accounts->count() > 0) {
@@ -540,12 +611,25 @@ class BudgetRepository implements BudgetRepositoryInterface
      */
     public function updateLimitAmount(Budget $budget, Carbon $start, Carbon $end, int $amount): BudgetLimit
     {
+        // count the limits:
+        $limits = $budget->budgetlimits()
+                         ->where('budget_limits.start_date', $start->format('Y-m-d'))
+                         ->where('budget_limits.end_date', $end->format('Y-m-d'))
+                         ->get(['budget_limits.*'])->count();
         // there might be a budget limit for these dates:
         /** @var BudgetLimit $limit */
         $limit = $budget->budgetlimits()
                         ->where('budget_limits.start_date', $start->format('Y-m-d'))
                         ->where('budget_limits.end_date', $end->format('Y-m-d'))
                         ->first(['budget_limits.*']);
+
+        // if more than 1 limit found, delete the others:
+        if ($limits > 1 && !is_null($limit)) {
+            $budget->budgetlimits()
+                   ->where('budget_limits.start_date', $start->format('Y-m-d'))
+                   ->where('budget_limits.end_date', $end->format('Y-m-d'))
+                   ->where('budget_limits.id', '!=', $limit->id)->delete();
+        }
 
         // delete if amount is zero.
         if (!is_null($limit) && $amount <= 0.0) {

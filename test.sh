@@ -10,11 +10,18 @@ TESTINGENV=./.env.testing
 resetTestFlag=''
 testflag=''
 coverageflag=''
-acceptancetestclass=''
+
+featureflag=''
+featuretestclass=''
+
+unitflag=''
+unittestclass=''
+
 verbalflag=''
 testsuite=''
+configfile='phpunit.xml';
 
-while getopts 'vcrta:s:' flag; do
+while getopts 'vcrtf:u:s:' flag; do
   case "${flag}" in
     r)
         resetTestFlag='true'
@@ -24,14 +31,21 @@ while getopts 'vcrta:s:' flag; do
     ;;
     c)
         coverageflag='true'
+        configfile='phpunit.coverage.xml';
     ;;
     v)
         verbalflag=' -v --debug'
         echo "Will be verbal about it"
     ;;
-    a)
-        acceptancetestclass=./tests/acceptance/$OPTARG
-        echo "Will only run acceptance test $OPTARG"
+    f)
+        featureflag='true'
+        featuretestclass=./tests/Feature/$OPTARG
+        echo "Will only run Feature test $OPTARG"
+    ;;
+    u)
+        unitflag='true'
+        unittestclass=./tests/Unit/$OPTARG
+        echo "Will only run Unit test $OPTARG"
     ;;
     s)
         testsuite="--testsuite $OPTARG"
@@ -41,6 +55,11 @@ while getopts 'vcrta:s:' flag; do
   esac
 done
 
+if [[ $coverageflag == "true" && ($featureflag == "true" || $unitflag == "true") ]]
+then
+    echo "Use config file specific.xml"
+    configfile='phpunit.coverage.specific.xml'
+fi
 
 
 # backup current config (if it exists):
@@ -50,9 +69,6 @@ fi
 
 # enable testing config
 cp $TESTINGENV $ORIGINALENV
-
-# clear cache:
-php artisan cache:clear
 
 # reset database (optional)
 if [[ $resetTestFlag == "true" ]]
@@ -71,8 +87,15 @@ then
 
     # call test data generation script
     $(which php) /sites/FF3/test-data/artisan generate:data local sqlite
+
+    # also run upgrade routine:
+    $(which php) /sites/FF3/firefly-iii/artisan firefly:upgrade-database
+
     # copy new database over backup (resets backup)
     cp $DATABASE $DATABASECOPY
+
+    # copy new database to test-data repository:
+    cp $DATABASE /sites/FF3/test-data/storage/database.sqlite
 fi
 
 # do not reset database (optional)
@@ -85,6 +108,13 @@ echo "Copy test database over original"
 # take database from copy:
 cp $DATABASECOPY $DATABASE
 
+echo "clear caches and what-not.."
+php artisan cache:clear
+php artisan config:clear
+php artisan route:clear
+# php artisan twig:clean
+php artisan view:clear
+
 # run PHPUnit
 if [[ $testflag == "" ]]
 then
@@ -95,12 +125,13 @@ else
     if [[ $coverageflag == "" ]]
     then
         echo "Must run PHPUnit without coverage:"
-        echo "phpunit --stop-on-error $verbalflag $acceptancetestclass $testsuite"
-        phpunit --stop-on-error $verbalflag $acceptancetestclass $testsuite
+
+        echo "phpunit $verbalflag --configuration $configfile $featuretestclass $unittestclass $testsuite"
+        phpunit $verbalflag  --configuration $configfile $featuretestclass $unittestclass $testsuite
     else
         echo "Must run PHPUnit with coverage"
-        echo "phpunit --stop-on-error $verbalflag --configuration phpunit.coverage.xml $acceptancetestclass $testsuite"
-        phpunit --stop-on-error $verbalflag --configuration phpunit.coverage.xml $acceptancetestclass $testsuite
+        echo "phpunit $verbalflag --configuration $configfile $featuretestclass $unittestclass $testsuite"
+        phpunit $verbalflag --configuration $configfile $featuretestclass $unittestclass $testsuite
     fi
 fi
 

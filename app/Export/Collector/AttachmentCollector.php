@@ -1,22 +1,31 @@
 <?php
 /**
  * AttachmentCollector.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Export\Collector;
 
 use Carbon\Carbon;
 use Crypt;
 use FireflyIII\Models\Attachment;
-use FireflyIII\Models\ExportJob;
 use FireflyIII\Repositories\Attachment\AttachmentRepositoryInterface;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Collection;
@@ -43,10 +52,8 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
 
     /**
      * AttachmentCollector constructor.
-     *
-     * @param ExportJob $job
      */
-    public function __construct(ExportJob $job)
+    public function __construct()
     {
         /** @var AttachmentRepositoryInterface repository */
         $this->repository = app(AttachmentRepositoryInterface::class);
@@ -54,7 +61,7 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
         $this->uploadDisk = Storage::disk('upload');
         $this->exportDisk = Storage::disk('export');
 
-        parent::__construct($job);
+        parent::__construct();
     }
 
     /**
@@ -125,6 +132,7 @@ class AttachmentCollector extends BasicCollector implements CollectorInterface
      */
     private function getAttachments(): Collection
     {
+        $this->repository->setUser($this->user);
         $attachments = $this->repository->getBetween($this->start, $this->end);
 
         return $attachments;

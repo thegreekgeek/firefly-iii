@@ -7,12 +7,12 @@
 {% block content %}
     <div class="row">
         <div class="col-lg-8 col-md-8 col-sm-6">
-            <div class="box">
+            <div class="box" id="piggyChart">
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'events'|_ }}</h3>
                 </div>
                 <div class="box-body">
-                    <canvas id="piggy-bank-history" style="width:100%;height:400px;" height="400"></canvas>
+                    <canvas id="piggy-bank-history" style="width:100%;height:400px;" height="400" width="100%"></canvas>
                 </div>
             </div>
         </div>
@@ -21,7 +21,7 @@
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'details'|_ }}</h3>
 
-                    <!-- ACTIONS MENU -->
+
                     <div class="box-tools pull-right">
                         <div class="btn-group">
                             <button class="btn btn-box-tool dropdown-toggle" data-toggle="dropdown"><i class="fa fa-ellipsis-v"></i></button>
@@ -33,7 +33,7 @@
                     </div>
                 </div>
                 <div class="box-body table-responsive no-padding">
-                    <table class="table table-hover">
+                    <table class="table table-hover" id="piggyDetails">
                         <tr>
                             <td style="width:40%;">{{ 'account'|_ }}</td>
                             <td><a href="{{ route('accounts.show', piggyBank.account_id) }}">{{ piggyBank.account.name }}</a></td>
@@ -70,6 +70,14 @@
                                 {% endif %}
                             </td>
                         </tr>
+                        {% if piggyBank.targetdate %}
+                            <tr>
+                                <td>{{ 'suggested_amount'|_ }}</td>
+                                <td>
+                                    {{ suggestedMonthlyAmount(piggyBank)|formatAmount }}
+                                </td>
+                            </tr>
+                        {% endif %}
                     </table>
                 </div>
             </div>
@@ -77,7 +85,7 @@
                 <div class="box-header with-border">
                     <h3 class="box-title">{{ 'table'|_ }}</h3>
                 </div>
-                <div class="box-body table-responsive no-padding">
+                <div class="box-body table-responsive no-padding" id="piggyEvents">
                     {% include 'list/piggy-bank-events' %}
                 </div>
             </div>
@@ -92,7 +100,7 @@
                         <h3 class="box-title">{{ trans('form.notes') }}</h3>
                     </div>
                     <div class="box-body">
-                            {{ note.markdown|raw }}
+                        {{ note.markdown|raw }}
                     </div>
                 </div>
 
@@ -106,8 +114,8 @@
         var piggyBankID = {{ piggyBank.id }};
     </script>
 
-    <script type="text/javascript" src="js/lib/Chart.bundle.min.js"></script>
-    <script type="text/javascript" src="js/ff/charts.defaults.js"></script>
-    <script type="text/javascript" src="js/ff/charts.js"></script>
-    <script type="text/javascript" src="js/ff/piggy-banks/show.js"></script>
+    <script type="text/javascript" src="js/lib/Chart.bundle.min.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/ff/charts.defaults.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/ff/charts.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/ff/piggy-banks/show.js?v={{ FF_VERSION }}"></script>
 {% endblock %}

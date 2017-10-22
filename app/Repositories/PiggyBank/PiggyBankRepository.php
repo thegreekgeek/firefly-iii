@@ -1,25 +1,37 @@
 <?php
 /**
  * PiggyBankRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\PiggyBank;
 
-use Amount;
 use Carbon\Carbon;
 use FireflyIII\Models\Note;
 use FireflyIII\Models\PiggyBank;
 use FireflyIII\Models\PiggyBankEvent;
+use FireflyIII\Models\PiggyBankRepetition;
+use FireflyIII\Models\TransactionJournal;
 use FireflyIII\User;
 use Illuminate\Support\Collection;
+use Log;
 
 /**
  * Class PiggyBankRepository
@@ -33,13 +45,66 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     private $user;
 
     /**
-     * PiggyBankRepository constructor.
+     * @param PiggyBank $piggyBank
+     * @param string    $amount
      *
-     * @param User $user
+     * @return bool
      */
-    public function __construct(User $user)
+    public function addAmount(PiggyBank $piggyBank, string $amount): bool
     {
-        $this->user = $user;
+        $repetition                = $piggyBank->currentRelevantRep();
+        $currentAmount             = $repetition->currentamount ?? '0';
+        $repetition->currentamount = bcadd($currentAmount, $amount);
+        $repetition->save();
+
+        // create event
+        $this->createEvent($piggyBank, $amount);
+
+        return true;
+    }
+
+    /**
+     * @param PiggyBankRepetition $repetition
+     * @param string              $amount
+     *
+     * @return string
+     */
+    public function addAmountToRepetition(PiggyBankRepetition $repetition, string $amount): string
+    {
+        $newAmount                 = bcadd($repetition->currentamount, $amount);
+        $repetition->currentamount = $newAmount;
+        $repetition->save();
+
+        return $newAmount;
+    }
+
+    /**
+     * @param PiggyBank $piggyBank
+     * @param string    $amount
+     *
+     * @return bool
+     */
+    public function canAddAmount(PiggyBank $piggyBank, string $amount): bool
+    {
+        $leftOnAccount = $piggyBank->leftOnAccount(new Carbon);
+        $savedSoFar    = strval($piggyBank->currentRelevantRep()->currentamount);
+        $leftToSave    = bcsub($piggyBank->targetamount, $savedSoFar);
+        $maxAmount     = strval(min(round($leftOnAccount, 12), round($leftToSave, 12)));
+
+        return bccomp($amount, $maxAmount) <= 0;
+    }
+
+    /**
+     * @param PiggyBank $piggyBank
+     * @param string    $amount
+     *
+     * @return bool
+     */
+    public function canRemoveAmount(PiggyBank $piggyBank, string $amount): bool
+    {
+        $savedSoFar = $piggyBank->currentRelevantRep()->currentamount;
+
+        return bccomp($amount, $savedSoFar) <= 0;
     }
 
     /**
@@ -50,7 +115,25 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
      */
     public function createEvent(PiggyBank $piggyBank, string $amount): PiggyBankEvent
     {
+        /** @var PiggyBankEvent $event */
         $event = PiggyBankEvent::create(['date' => Carbon::now(), 'amount' => $amount, 'piggy_bank_id' => $piggyBank->id]);
+
+        return $event;
+    }
+
+    /**
+     * @param PiggyBank          $piggyBank
+     * @param string             $amount
+     * @param TransactionJournal $journal
+     *
+     * @return PiggyBankEvent
+     */
+    public function createEventWithJournal(PiggyBank $piggyBank, string $amount, TransactionJournal $journal): PiggyBankEvent
+    {
+        /** @var PiggyBankEvent $event */
+        $event = PiggyBankEvent::create(
+            ['piggy_bank_id' => $piggyBank->id, 'transaction_journal_id' => $journal->id, 'date' => $journal->date, 'amount' => $amount]
+        );
 
         return $event;
     }
@@ -94,6 +177,53 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     }
 
     /**
+     * Used for connecting to a piggy bank.
+     *
+     * @param PiggyBank           $piggyBank
+     * @param PiggyBankRepetition $repetition
+     * @param TransactionJournal  $journal
+     *
+     * @return string
+     */
+    public function getExactAmount(PiggyBank $piggyBank, PiggyBankRepetition $repetition, TransactionJournal $journal): string
+    {
+        $amount  = $journal->amountPositive();
+        $sources = $journal->sourceAccountList()->pluck('id')->toArray();
+        $room    = bcsub(strval($piggyBank->targetamount), strval($repetition->currentamount));
+        $compare = bcmul($repetition->currentamount, '-1');
+
+        Log::debug(sprintf('Will add/remove %f to piggy bank #%d ("%s")', $amount, $piggyBank->id, $piggyBank->name));
+
+        // if piggy account matches source account, the amount is positive
+        if (in_array($piggyBank->account_id, $sources)) {
+            $amount = bcmul($amount, '-1');
+            Log::debug(sprintf('Account #%d is the source, so will remove amount from piggy bank.', $piggyBank->account_id));
+        }
+
+
+        // if the amount is positive, make sure it fits in piggy bank:
+        if (bccomp($amount, '0') === 1 && bccomp($room, $amount) === -1) {
+            // amount is positive and $room is smaller than $amount
+            Log::debug(sprintf('Room in piggy bank for extra money is %f', $room));
+            Log::debug(sprintf('There is NO room to add %f to piggy bank #%d ("%s")', $amount, $piggyBank->id, $piggyBank->name));
+            Log::debug(sprintf('New amount is %f', $room));
+
+            return $room;
+        }
+
+        // amount is negative and $currentamount is smaller than $amount
+        if (bccomp($amount, '0') === -1 && bccomp($compare, $amount) === 1) {
+            Log::debug(sprintf('Max amount to remove is %f', $repetition->currentamount));
+            Log::debug(sprintf('Cannot remove %f from piggy bank #%d ("%s")', $amount, $piggyBank->id, $piggyBank->name));
+            Log::debug(sprintf('New amount is %f', $compare));
+
+            return $compare;
+        }
+
+        return $amount;
+    }
+
+    /**
      * @return int
      */
     public function getMaxOrder(): int
@@ -119,13 +249,49 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
      */
     public function getPiggyBanksWithAmount(): Collection
     {
-        $set = $this->getPiggyBanks();
+        $currency = app('amount')->getDefaultCurrency();
+        $set      = $this->getPiggyBanks();
         foreach ($set as $piggy) {
             $currentAmount = $piggy->currentRelevantRep()->currentamount ?? '0';
-            $piggy->name   = $piggy->name . ' (' . Amount::format($currentAmount, false) . ')';
+
+            $piggy->name = $piggy->name . ' (' . app('amount')->formatAnything($currency, $currentAmount, false) . ')';
         }
 
         return $set;
+    }
+
+    /**
+     * @param PiggyBank $piggyBank
+     * @param Carbon    $date
+     *
+     * @return PiggyBankRepetition
+     */
+    public function getRepetition(PiggyBank $piggyBank, Carbon $date): PiggyBankRepetition
+    {
+        $repetition = $piggyBank->piggyBankRepetitions()->relevantOnDate($date)->first();
+        if (is_null($repetition)) {
+            return new PiggyBankRepetition;
+        }
+
+        return $repetition;
+    }
+
+    /**
+     * @param PiggyBank $piggyBank
+     * @param string    $amount
+     *
+     * @return bool
+     */
+    public function removeAmount(PiggyBank $piggyBank, string $amount): bool
+    {
+        $repetition                = $piggyBank->currentRelevantRep();
+        $repetition->currentamount = bcsub($repetition->currentamount, $amount);
+        $repetition->save();
+
+        // create event
+        $this->createEvent($piggyBank, bcmul($amount, '-1'));
+
+        return true;
     }
 
     /**
@@ -168,6 +334,14 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return PiggyBank
@@ -175,7 +349,8 @@ class PiggyBankRepository implements PiggyBankRepositoryInterface
     public function store(array $data): PiggyBank
     {
         $data['order'] = $this->getMaxOrder() + 1;
-        $piggyBank     = PiggyBank::create($data);
+        /** @var PiggyBank $piggyBank */
+        $piggyBank = PiggyBank::create($data);
 
         $this->updateNote($piggyBank, $data['note']);
 

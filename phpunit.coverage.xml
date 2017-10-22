@@ -1,37 +1,44 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ phpunit.coverage.xml
+  ~ Copyright (c) 2017 thegrumpydictator@gmail.com
+  ~ This software may be modified and distributed under the terms of the
+  ~ Creative Commons Attribution-ShareAlike 4.0 International License.
+  ~
+  ~ See the LICENSE file for details.
+  -->
+
 <phpunit backupGlobals="false"
          backupStaticAttributes="false"
-         bootstrap="bootstrap/autoload.php"
+         bootstrap="vendor/autoload.php"
          colors="true"
          convertErrorsToExceptions="true"
          convertNoticesToExceptions="true"
          convertWarningsToExceptions="true"
          processIsolation="false"
-         beStrictAboutOutputDuringTests="true"
          stopOnFailure="true">
     <testsuites>
-        <testsuite name="acceptance">
-            <directory suffix="Test.php">./tests/acceptance</directory>
+        <testsuite name="Feature">
+            <directory suffix="Test.php">./tests/Feature</directory>
         </testsuite>
-        <testsuite name="unit">
-            <directory suffix="Test.php">./tests/unit</directory>
+
+        <testsuite name="Unit">
+            <directory suffix="Test.php">./tests/Unit</directory>
         </testsuite>
     </testsuites>
-
-
-
-
-
     <filter>
-        <whitelist addUncoveredFilesFromWhitelist="true">
+        <whitelist processUncoveredFilesFromWhitelist="true">
             <directory suffix=".php">./app</directory>
+            <exclude>
+                <file>app/Http/breadcrumbs.php</file>
+            </exclude>
         </whitelist>
         <blacklist>
             <directory>vendor/</directory>
         </blacklist>
     </filter>
     <logging>
-        <log type="coverage-clover" target="./storage/build/clover.xml" charset="UTF-8"/>
+        <log type="coverage-clover" target="./storage/build/clover-all.xml" charset="UTF-8"/>
     </logging>
     <php>
         <env name="APP_ENV" value="testing"/>

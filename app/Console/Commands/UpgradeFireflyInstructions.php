@@ -1,15 +1,25 @@
 <?php
 /**
  * UpgradeFireflyInstructions.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Console\Commands;
 
@@ -50,10 +60,10 @@ class UpgradeFireflyInstructions extends Command
     public function handle()
     {
 
-        if ($this->argument('task') == 'update') {
+        if ($this->argument('task') === 'update') {
             $this->updateInstructions();
         }
-        if ($this->argument('task') == 'install') {
+        if ($this->argument('task') === 'install') {
             $this->installInstructions();
         }
     }
@@ -85,20 +95,10 @@ class UpgradeFireflyInstructions extends Command
     }
 
     /**
-     * Show a line
+     * Render instructions.
      */
-    private function showLine()
+    private function installInstructions()
     {
-        $line = '+';
-        for ($i = 0; $i < 78; $i++) {
-            $line .= '-';
-        }
-        $line .= '+';
-        $this->line($line);
-
-    }
-
-    private function installInstructions() {
         /** @var string $version */
         $version = config('firefly.version');
         $config  = config('upgrade.text.install');
@@ -115,11 +115,12 @@ class UpgradeFireflyInstructions extends Command
         $this->boxed('');
         if (is_null($text)) {
 
-            $this->boxed(sprintf('Thank you for installin Firefly III, v%s!', $version));
+            $this->boxed(sprintf('Thank you for installing Firefly III, v%s!', $version));
             $this->boxedInfo('There are no extra installation instructions.');
             $this->boxed('Firefly III should be ready for use.');
             $this->boxed('');
             $this->showLine();
+
             return;
         }
 
@@ -129,6 +130,23 @@ class UpgradeFireflyInstructions extends Command
         $this->showLine();
     }
 
+    /**
+     * Show a line
+     */
+    private function showLine()
+    {
+        $line = '+';
+        for ($i = 0; $i < 78; $i++) {
+            $line .= '-';
+        }
+        $line .= '+';
+        $this->line($line);
+
+    }
+
+    /**
+     * Render upgrade instructions.
+     */
     private function updateInstructions()
     {
         /** @var string $version */
@@ -152,6 +170,7 @@ class UpgradeFireflyInstructions extends Command
             $this->boxed('Firefly III should be ready for use.');
             $this->boxed('');
             $this->showLine();
+
             return;
         }
 

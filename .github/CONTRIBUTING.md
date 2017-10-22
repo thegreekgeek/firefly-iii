@@ -4,16 +4,12 @@
 
 ## Feature requests
 
-If you are requesting a new feature, please check out the list of [often requested features](https://firefly-iii.github.io/requested-features/).
-
-## Bugs
-
-If you find a bug, include as many log files and details as you think are necessary. 
-
-## Installation problems
-
-Take the time to read the [installation guide FAQ](https://firefly-iii.github.io/installation-guide-faq/) and make sure you search through closed issues for the problems other people have had. Your problem may be among them!
+I am always interested in expanding Firefly III's many features. If you are requesting a new feature, please check out the list of [often requested features](https://firefly-iii.github.io/requested-features/).
 
 ## Pull requests
 
-I can only accept pull requests against the `develop` branch, never the `master` branch
+When contributing to Firefly III, please first discuss the change you wish to make via issue, email, or any other method. I can only accept pull requests against the `develop` branch, never the `master` branch.
+
+## Translations :us: :fr: :de:
+
+If you see a spelling error, grammatical error or a weird translation in your language, please join [our CrowdIn](https://crowdin.com/project/firefly-iii) project. There, you can submit your translations and fixes. The GitHub repository will download these automatically and they will be included in the next release.

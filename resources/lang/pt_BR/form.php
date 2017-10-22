@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * form.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -28,12 +30,10 @@ return [
     'currency_id'                    => 'Moeda',
     'attachments'                    => 'Anexos',
     'journal_amount'                 => 'Quantia',
-    'journal_asset_source_account'   => 'Conta de ativo (fonte)',
     'journal_source_account_name'    => 'Conta de receita (fonte)',
     'journal_source_account_id'      => 'Conta de ativo (fonte)',
     'BIC'                            => 'BIC',
-    'account_from_id'                => 'da conta',
-    'account_to_id'                  => 'para conta',
+    'verify_password'                => 'Verify password security',
     'source_account'                 => 'Conta de origem',
     'destination_account'            => 'Conta de destino',
     'journal_destination_account_id' => 'Conta de ativo (destino)',
@@ -48,9 +48,8 @@ return [
     'budget_id'                      => 'Orçamento',
     'openingBalance'                 => 'Saldo inicial',
     'tagMode'                        => 'Modo de tag',
-    'tagPosition'                    => 'Localização de tag',
+    'tag_position'                    => 'Tag location',
     'virtualBalance'                 => 'Saldo virtual',
-    'longitude_latitude'             => 'Localização',
     'targetamount'                   => 'Valor alvo',
     'accountRole'                    => 'Tipo de conta',
     'openingBalanceDate'             => 'Data do Saldo inicial',
@@ -63,9 +62,15 @@ return [
     'description'                    => 'Descrição',
     'expense_account'                => 'Conta de Despesa',
     'revenue_account'                => 'Conta de Receita',
-    'decimal_places'                 => 'Decimal places',
+    'decimal_places'                 => 'Casas décimais',
+    'exchange_rate_instruction'      => 'Moedas estrangeiras',
+    'source_amount'                  => 'Amount (source)',
+    'destination_amount'             => 'Amount (destination)',
+    'native_amount'                  => 'Native amount',
+    'new_email_address'              => 'New email address',
+    'verification'                   => 'Verification',
+    'api_key'                        => 'API key',
 
-    'revenue_account_source'      => 'Conta de receita (fonte)',
     'source_account_asset'        => 'Conta de origem (conta de ativo)',
     'destination_account_expense' => 'Conta de destino (conta de despesa)',
     'destination_account_asset'   => 'Conta de destino (conta de ativo)',
@@ -92,6 +97,7 @@ return [
     'code'                       => 'Código',
     'iban'                       => 'IBAN',
     'accountNumber'              => 'Número de conta',
+    'creditCardNumber'           => 'Credit card number',
     'has_headers'                => 'Cabeçalhos',
     'date_format'                => 'Formato da Data',
     'specifix'                   => 'Banco- ou arquivo específico corrigídos',
@@ -102,7 +108,6 @@ return [
     'add_new_withdrawal'         => 'Adicionar uma nova retirada',
     'add_new_deposit'            => 'Adicionar um novo depósito',
     'add_new_transfer'           => 'Adicionar uma nova transferência',
-    'noPiggybank'                => '(nenhum cofrinho)',
     'title'                      => 'Título',
     'notes'                      => 'Notas',
     'filename'                   => 'Nome do arquivo',
@@ -127,6 +132,9 @@ return [
     'delete_attachment'          => 'Apagar anexo ":name"',
     'delete_rule'                => 'Excluir regra ":title"',
     'delete_rule_group'          => 'Exclua o grupo de regras ":title"',
+    'delete_link_type'           => 'Delete link type ":name"',
+    'delete_user'                => 'Delete user ":email"',
+    'user_areYouSure'            => 'If you delete user ":email", everything will be gone. There is no undo, undelete or anything. If you delete yourself, you will lose access to this instance of Firefly III.',
     'attachment_areYouSure'      => 'Tem certeza que deseja excluir o anexo denominado ":name"?',
     'account_areYouSure'         => 'Tem certeza que deseja excluir a conta denominada ":name"?',
     'bill_areYouSure'            => 'Você tem certeza que quer apagar a fatura ":name"?',
@@ -139,11 +147,14 @@ return [
     'journal_areYouSure'         => 'Tem certeza que deseja excluir a transação descrita ":description"?',
     'mass_journal_are_you_sure'  => 'Tem a certeza que pretende apagar estas transações?',
     'tag_areYouSure'             => 'Você tem certeza que quer apagar a tag ":tag"?',
+    'journal_link_areYouSure'    => 'Are you sure you want to delete the link between <a href=":source_link">:source</a> and <a href=":destination_link">:destination</a>?',
+    'linkType_areYouSure'        => 'Are you sure you want to delete the link type ":name" (":inward" / ":outward")?',
     'permDeleteWarning'          => 'Exclusão de dados do Firely são permanentes e não podem ser desfeitos.',
     'mass_make_selection'        => 'Você ainda pode evitar que itens sejam excluídos, removendo a caixa de seleção.',
     'delete_all_permanently'     => 'Exclua os selecionados permanentemente',
     'update_all_journals'        => 'Atualizar essas transações',
     'also_delete_transactions'   => 'A única transação ligada a essa conta será excluída também.|Todas as :count transações ligadas a esta conta serão excluídas também.',
+    'also_delete_connections'    => 'The only transaction linked with this link type will lose this connection.|All :count transactions linked with this link type will lose their connection.',
     'also_delete_rules'          => 'A única regra que ligado a este grupo de regras será excluída também.|Todos as :count regras ligadas a este grupo de regras serão excluídas também.',
     'also_delete_piggyBanks'     => 'O único cofrinho conectado a essa conta será excluído também.|Todos os :count cofrinhos conectados a esta conta serão excluídos também.',
     'bill_keep_transactions'     => 'A única transação a esta conta não será excluída.|Todos as :count transações conectadas a esta fatura não serão excluídos.',
@@ -151,17 +162,16 @@ return [
     'category_keep_transactions' => 'A única transação ligada a esta categoria não será excluída.|Todos :count transações ligadas a esta categoria não serão excluídos.',
     'tag_keep_transactions'      => 'A única transação ligada a essa marca não será excluída.|Todos :count transações ligadas a essa marca não serão excluídos.',
 
-    'email'                 => 'Email address',
-    'password'              => 'Password',
-    'password_confirmation' => 'Password (again)',
-    'blocked'               => 'Is blocked?',
+    'email'                 => 'E-mail',
+    'password'              => 'Senha',
+    'password_confirmation' => 'Senha(Confirmar)',
+    'blocked'               => 'Está bloqueado?',
     'blocked_code'          => 'Reason for block',
 
 
     // admin
     'domain'                => 'Domínio',
     'single_user_mode'      => 'Modo de usuário único',
-    'must_confirm_account'  => 'Novos usuários devem ativar a conta',
     'is_demo_site'          => 'É o site de demonstração',
 
 
@@ -181,4 +191,7 @@ return [
     'payment_date'       => 'Data de pagamento',
     'invoice_date'       => 'Data da Fatura',
     'internal_reference' => 'Referência interna',
+    'inward'             => 'Inward description',
+    'outward'            => 'Outward description',
+    'rule_group_id'      => 'Rule group',
 ];

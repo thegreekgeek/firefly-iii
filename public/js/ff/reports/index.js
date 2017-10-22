@@ -1,11 +1,21 @@
 /*
  * index.js
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /** global: minDate, nonSelectedText, allSelectedText, filterPlaceholder */
@@ -29,10 +39,10 @@ $(function () {
             {
                 locale: {
                     format: 'YYYY-MM-DD',
-                    firstDay: 1,
+                    firstDay: 1
                 },
                 minDate: minDate,
-                drops: 'up',
+                drops: 'up'
             }
         );
 
@@ -56,7 +66,7 @@ $(function () {
         // set date from cookie
         var startStr = readCookie('report-start');
         var endStr = readCookie('report-end');
-        if (startStr !== null && endStr !== null && startStr.length == 8 && endStr.length == 8) {
+        if (startStr !== null && endStr !== null && startStr.length === 8 && endStr.length === 8) {
             var startDate = moment(startStr, "YYYY-MM-DD");
             var endDate = moment(endStr, "YYYY-MM-DD");
             var datePicker = $('#inputDateRange').data('daterangepicker');
@@ -98,8 +108,8 @@ function setOptionalFromCookies() {
         arr.forEach(function (val) {
             $('#inputCategories').find('option[value="' + val + '"]').prop('selected', true);
         });
-        $('#inputCategories').multiselect(defaultMultiSelect);
     }
+    $('#inputCategories').multiselect(defaultMultiSelect);
 
     // and budgets!
     if ((readCookie('report-budgets') !== null)) {
@@ -107,8 +117,17 @@ function setOptionalFromCookies() {
         arr.forEach(function (val) {
             $('#inputBudgets').find('option[value="' + val + '"]').prop('selected', true);
         });
-        $('#inputBudgets').multiselect(defaultMultiSelect);
     }
+    $('#inputBudgets').multiselect(defaultMultiSelect);
+
+    // and tags!
+    if ((readCookie('report-tags') !== null)) {
+        arr = readCookie('report-tags').split(',');
+        arr.forEach(function (val) {
+            $('#inputBudgets').find('option[value="' + val + '"]').prop('selected', true);
+        });
+    }
+    $('#inputTags').multiselect(defaultMultiSelect);
 }
 
 function catchSubmit() {
@@ -117,45 +136,20 @@ function catchSubmit() {
     var picker = $('#inputDateRange').data('daterangepicker');
 
     // all account ids:
-    var count = 0;
-    var accounts = [];
-    $.each($('.account-checkbox'), function (i, v) {
-        var c = $(v);
-        if (c.prop('checked')) {
-            accounts.push(c.val());
-            count++;
-        }
-    });
-
-    // all category ids:
-    var categories = [];
-    $.each($('.category-checkbox'), function (i, v) {
-        var c = $(v);
-        if (c.prop('checked')) {
-            categories.push(c.val());
-        }
-    });
-
-    // all budget ids:
-    var budgets = [];
-    $.each($('.budget-checkbox'), function (i, v) {
-        var c = $(v);
-        if (c.prop('checked')) {
-            budgets.push(c.val());
-        }
-    });
-
+    var accounts = $('#inputAccounts').val();
+    var categories = $('#inputCategories').val();
+    var budgets = $('#inputBudgets').val();
+    var tags = $('#inputTags').val();
 
     // remember all
-    if (count > 0) {
-        // set cookie to remember choices.
-        createCookie('report-type', $('select[name="report_type"]').val(), 365);
-        createCookie('report-accounts', accounts, 365);
-        createCookie('report-categories', categories, 365);
-        createCookie('report-budgets', budgets, 365);
-        createCookie('report-start', moment(picker.startDate).format("YYYYMMDD"), 365);
-        createCookie('report-end', moment(picker.endDate).format("YYYYMMDD"), 365);
-    }
+    // set cookie to remember choices.
+    createCookie('report-type', $('select[name="report_type"]').val(), 365);
+    createCookie('report-accounts', accounts, 365);
+    createCookie('report-categories', categories, 365);
+    createCookie('report-budgets', budgets, 365);
+    createCookie('report-tags', tags, 365);
+    createCookie('report-start', moment(picker.startDate).format("YYYYMMDD"), 365);
+    createCookie('report-end', moment(picker.endDate).format("YYYYMMDD"), 365);
 
     return true;
 }

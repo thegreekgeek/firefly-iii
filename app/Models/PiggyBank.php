@@ -1,21 +1,32 @@
 <?php
 /**
  * PiggyBank.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Models;
 
 use Carbon\Carbon;
 use Crypt;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Steam;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -57,7 +68,7 @@ class PiggyBank extends Model
     public static function routeBinder(PiggyBank $value)
     {
         if (auth()->check()) {
-            if ($value->account->user_id == auth()->user()->id) {
+            if (intval($value->account->user_id) === auth()->user()->id) {
                 return $value;
             }
         }
@@ -67,7 +78,7 @@ class PiggyBank extends Model
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function account()
+    public function account(): BelongsTo
     {
         return $this->belongsTo('FireflyIII\Models\Account');
     }
@@ -83,6 +94,7 @@ class PiggyBank extends Model
             return $this->currentRep;
         }
         // repeating piggy banks are no longer supported.
+        /** @var PiggyBankRepetition $rep */
         $rep = $this->piggyBankRepetitions()->first(['piggy_bank_repetitions.*']);
         if (is_null($rep)) {
             return new PiggyBankRepetition();
@@ -106,6 +118,31 @@ class PiggyBank extends Model
         }
 
         return $value;
+    }
+
+    /**
+     * @return string
+     */
+    public function getSuggestedMonthlyAmount(): string
+    {
+        $savePerMonth = '0';
+        if ($this->targetdate && $this->currentRelevantRep()->currentamount < $this->targetamount) {
+            $now             = Carbon::now();
+            $diffInMonths    = $now->diffInMonths($this->targetdate, false);
+            $remainingAmount = bcsub($this->targetamount, $this->currentRelevantRep()->currentamount);
+
+            // more than 1 month to go and still need money to save:
+            if ($diffInMonths > 0 && bccomp($remainingAmount, '0') === 1) {
+                $savePerMonth = bcdiv($remainingAmount, strval($diffInMonths));
+            }
+
+            // less than 1 month to go but still need money to save:
+            if ($diffInMonths === 0 && bccomp($remainingAmount, '0') === 1) {
+                $savePerMonth = $remainingAmount;
+            }
+        }
+
+        return $savePerMonth;
     }
 
     /**

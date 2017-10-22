@@ -1,15 +1,25 @@
 <?php
 /**
  * RuleRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Rule;
 
@@ -29,16 +39,6 @@ class RuleRepository implements RuleRepositoryInterface
 {
     /** @var User */
     private $user;
-
-    /**
-     * BillRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @return int
@@ -64,6 +64,21 @@ class RuleRepository implements RuleRepositoryInterface
         $rule->delete();
 
         return true;
+    }
+
+    /**
+     * @param int $ruleId
+     *
+     * @return Rule
+     */
+    public function find(int $ruleId): Rule
+    {
+        $rule = $this->user->rules()->find($ruleId);
+        if (is_null($rule)) {
+            return new Rule;
+        }
+
+        return $rule;
     }
 
     /**
@@ -219,6 +234,14 @@ class RuleRepository implements RuleRepositoryInterface
     }
 
     /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
+    }
+
+    /**
      * @param array $data
      *
      * @return Rule
@@ -238,7 +261,7 @@ class RuleRepository implements RuleRepositoryInterface
         $rule->rule_group_id   = $data['rule_group_id'];
         $rule->order           = ($order + 1);
         $rule->active          = 1;
-        $rule->stop_processing = intval($data['stop_processing']) == 1;
+        $rule->stop_processing = intval($data['stop_processing']) === 1;
         $rule->title           = $data['title'];
         $rule->description     = strlen($data['description']) > 0 ? $data['description'] : null;
 
@@ -267,7 +290,7 @@ class RuleRepository implements RuleRepositoryInterface
         $ruleAction->active          = 1;
         $ruleAction->stop_processing = $values['stopProcessing'];
         $ruleAction->action_type     = $values['action'];
-        $ruleAction->action_value    = $values['value'];
+        $ruleAction->action_value    = is_null($values['value']) ? '' : $values['value'];
         $ruleAction->save();
 
 
@@ -288,7 +311,7 @@ class RuleRepository implements RuleRepositoryInterface
         $ruleTrigger->active          = 1;
         $ruleTrigger->stop_processing = $values['stopProcessing'];
         $ruleTrigger->trigger_type    = $values['action'];
-        $ruleTrigger->trigger_value   = $values['value'];
+        $ruleTrigger->trigger_value   = is_null($values['value']) ? '' : $values['value'];
         $ruleTrigger->save();
 
         return $ruleTrigger;
@@ -303,6 +326,7 @@ class RuleRepository implements RuleRepositoryInterface
     public function update(Rule $rule, array $data): Rule
     {
         // update rule:
+        $rule->rule_group_id   = $data['rule_group_id'];
         $rule->active          = $data['active'];
         $rule->stop_processing = $data['stop_processing'];
         $rule->title           = $data['title'];
@@ -335,7 +359,7 @@ class RuleRepository implements RuleRepositoryInterface
     {
         $order = 1;
         foreach ($data['rule-actions'] as $index => $action) {
-            $value          = $data['rule-action-values'][$index];
+            $value          = $data['rule-action-values'][$index] ?? '';
             $stopProcessing = isset($data['rule-action-stop'][$index]) ? true : false;
 
             $actionValues = [

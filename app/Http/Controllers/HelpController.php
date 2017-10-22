@@ -1,15 +1,25 @@
 <?php
 /**
  * HelpController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
@@ -25,62 +35,95 @@ use Response;
  */
 class HelpController extends Controller
 {
+
+    /** @var HelpInterface */
+    private $help;
+
     /**
      * HelpController constructor.
      */
     public function __construct()
     {
         parent::__construct();
+
+        $this->middleware(
+            function ($request, $next) {
+                $this->help = app(HelpInterface::class);
+
+                return $next($request);
+            }
+        );
     }
 
     /**
-     * @param HelpInterface $help
      * @param               $route
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function show(HelpInterface $help, string $route)
+    public function show(string $route)
     {
-
         $language = Preferences::get('language', config('firefly.default_language', 'en_US'))->data;
-        $content  = '<p>' . strval(trans('firefly.route_has_no_help')) . '</p>';
+        $html     = $this->getHelpText($route, $language);
 
-        if (!$help->hasRoute($route)) {
+        return Response::json(['html' => $html]);
+
+    }
+
+    /**
+     * @param string $route
+     * @param string $language
+     *
+     * @return string
+     */
+    private function getHelpText(string $route, string $language): string
+    {
+        // get language and default variables.
+
+        $content = '<p>' . strval(trans('firefly.route_has_no_help')) . '</p>';
+
+        // if no such route, log error and return default text.
+        if (!$this->help->hasRoute($route)) {
             Log::error('No such route: ' . $route);
 
-            return Response::json($content);
+            return $content;
         }
 
-        if ($help->inCache($route, $language)) {
-            $content = $help->getFromCache($route, $language);
+        // help content may be cached:
+        if ($this->help->inCache($route, $language)) {
+            $content = $this->help->getFromCache($route, $language);
             Log::debug(sprintf('Help text %s was in cache.', $language));
 
-            return Response::json($content);
+            return $content;
         }
 
-        $content = $help->getFromGithub($language, $route);
+        // get help content from Github:
+        $content = $this->help->getFromGithub($route, $language);
 
-        // get backup language content (try English):
+        // content will have 0 length when Github failed. Try en_US when it does:
         if (strlen($content) === 0) {
             $language = 'en_US';
-            if ($help->inCache($route, $language)) {
+
+            // also check cache first:
+            if ($this->help->inCache($route, $language)) {
                 Log::debug(sprintf('Help text %s was in cache.', $language));
-                $content = $help->getFromCache($route, $language);
+                $content = $this->help->getFromCache($route, $language);
+
+                return $content;
             }
-            if (!$help->inCache($route, $language)) {
-                $content = $help->getFromGithub($language, $route);
-                $content = '<p><em>' . strval(trans('firefly.help_may_not_be_your_language')) . '</em></p>' . $content;
-            }
+
+            $content = $this->help->getFromGithub($route, $language);
+
         }
 
-        if (strlen($content) === 0) {
-            $content = '<p>' . strval(trans('firefly.route_has_no_help')) . '</p>';
+        // help still empty?
+        if (strlen($content) !== 0) {
+            $this->help->putInCache($route, $language, $content);
+
+            return $content;
+
         }
 
-        $help->putInCache($route, $language, $content);
-
-        return Response::json($content);
-
+        return '<p>' . strval(trans('firefly.route_has_no_help')) . '</p>';
     }
 
 

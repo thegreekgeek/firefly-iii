@@ -1,23 +1,36 @@
 <?php
 /**
  * CurrencyRepository.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Repositories\Currency;
 
 
+use Carbon\Carbon;
+use FireflyIII\Models\CurrencyExchangeRate;
 use FireflyIII\Models\Preference;
 use FireflyIII\Models\TransactionCurrency;
 use FireflyIII\User;
 use Illuminate\Support\Collection;
+use Log;
 use Preferences;
 
 /**
@@ -29,16 +42,6 @@ class CurrencyRepository implements CurrencyRepositoryInterface
 {
     /** @var User */
     private $user;
-
-    /**
-     * CategoryRepository constructor.
-     *
-     * @param User $user
-     */
-    public function __construct(User $user)
-    {
-        $this->user = $user;
-    }
 
     /**
      * @param TransactionCurrency $currency
@@ -123,7 +126,7 @@ class CurrencyRepository implements CurrencyRepositoryInterface
      */
     public function findByCode(string $currencyCode): TransactionCurrency
     {
-        $currency = TransactionCurrency::whereCode($currencyCode)->first();
+        $currency = TransactionCurrency::where('code', $currencyCode)->first();
         if (is_null($currency)) {
             $currency = new TransactionCurrency;
         }
@@ -174,18 +177,68 @@ class CurrencyRepository implements CurrencyRepositoryInterface
     }
 
     /**
+     * @param array $ids
+     *
+     * @return Collection
+     */
+    public function getByIds(array $ids): Collection
+    {
+        return TransactionCurrency::whereIn('id', $ids)->get();
+    }
+
+    /**
      * @param Preference $preference
      *
      * @return TransactionCurrency
      */
     public function getCurrencyByPreference(Preference $preference): TransactionCurrency
     {
-        $preferred = TransactionCurrency::whereCode($preference->data)->first();
+        $preferred = TransactionCurrency::where('code', $preference->data)->first();
         if (is_null($preferred)) {
             $preferred = TransactionCurrency::first();
         }
 
         return $preferred;
+    }
+
+    /**
+     * @param TransactionCurrency $fromCurrency
+     * @param TransactionCurrency $toCurrency
+     * @param Carbon              $date
+     *
+     * @return CurrencyExchangeRate
+     */
+    public function getExchangeRate(TransactionCurrency $fromCurrency, TransactionCurrency $toCurrency, Carbon $date): CurrencyExchangeRate
+    {
+        if ($fromCurrency->id === $toCurrency->id) {
+            $rate       = new CurrencyExchangeRate;
+            $rate->rate = 1;
+            $rate->id   = 0;
+
+            return $rate;
+        }
+
+        $rate = $this->user->currencyExchangeRates()
+                           ->where('from_currency_id', $fromCurrency->id)
+                           ->where('to_currency_id', $toCurrency->id)
+                           ->where('date', $date->format('Y-m-d'))->first();
+        if (!is_null($rate)) {
+            Log::debug(sprintf('Found cached exchange rate in database for %s to %s on %s', $fromCurrency->code, $toCurrency->code, $date->format('Y-m-d')));
+
+            return $rate;
+        }
+
+        return new CurrencyExchangeRate;
+
+
+    }
+
+    /**
+     * @param User $user
+     */
+    public function setUser(User $user)
+    {
+        $this->user = $user;
     }
 
     /**
@@ -195,6 +248,7 @@ class CurrencyRepository implements CurrencyRepositoryInterface
      */
     public function store(array $data): TransactionCurrency
     {
+        /** @var TransactionCurrency $currency */
         $currency = TransactionCurrency::create(
             [
                 'name'           => $data['name'],

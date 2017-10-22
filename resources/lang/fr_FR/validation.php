@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * validation.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -12,18 +14,17 @@
 return [
     'iban'                           => 'Il ne s\'agit pas d\'un IBAN valide.',
     'unique_account_number_for_user' => 'Il semble que ce numéro de compte est déjà utilisé.',
-    'deleted_user'                   => 'Due to security constraints, you cannot register using this email address.',
+    'deleted_user'                   => 'Compte tenu des contraintes de sécurité, vous ne pouvez pas vous inscrire en utilisant cette adresse e-mail.',
     'rule_trigger_value'             => 'Cette valeur n’est pas valide pour le déclencheur sélectionné.',
     'rule_action_value'              => 'Cette valeur n’est pas valide pour l’action sélectionnée.',
-    'invalid_domain'                 => 'Compte tenu des contraintes de sécurité, vous ne pouvez pas vous enregistrer depuis ce domaine.',
     'file_already_attached'          => 'Le fichier téléchargé ":name" est déjà attaché à cet objet.',
     'file_attached'                  => 'Envoi du fichier ":name" avec succès.',
     'file_invalid_mime'              => 'Le fichier ":name" est du type ":mime" ce qui n\'est pas accepté pour un nouvel envoi.',
     'file_too_large'                 => 'Le fichier ":name" est trop grand.',
     'belongs_to_user'                => 'La valeur de :attribute est inconnue',
     'accepted'                       => 'Le champ :attribute doit être accepté.',
-    'bic'                            => 'This is not a valid BIC.',
-    'more'                           => ':attribute must be larger than zero.',
+    'bic'                            => 'Ce n’est pas un code BIC valide.',
+    'more'                           => ':attribute doit être supérieur à zéro.',
     'active_url'                     => 'Le champ :attribute n\'est pas une URL valide.',
     'after'                          => 'Le champ :attribute doit être une date postérieure à :date.',
     'alpha'                          => 'Le champ :attribute doit seulement contenir des lettres.',
@@ -82,10 +83,11 @@ return [
     'url'                            => 'Le format de l\'URL de :attribute n\'est pas valide.',
     'timezone'                       => 'Le champ :attribute doit être un fuseau horaire valide.',
     '2fa_code'                       => 'Le champ :attribute est invalide.',
-    'dimensions'                     => 'The :attribute has invalid image dimensions.',
-    'distinct'                       => 'The :attribute field has a duplicate value.',
-    'file'                           => 'The :attribute must be a file.',
-    'in_array'                       => 'The :attribute field does not exist in :other.',
-    'present'                        => 'The :attribute field must be present.',
-    'amount_zero'                    => 'The total amount cannot be zero',
+    'dimensions'                     => 'Le :attribute possède des dimensions d’image non valides.',
+    'distinct'                       => ':attribute possède une valeur en double.',
+    'file'                           => 'Le :attribute doit être un fichier.',
+    'in_array'                       => 'Le champ :attribute n\'existe pas dans :other.',
+    'present'                        => 'Le champs :attribute doit être rempli.',
+    'amount_zero'                    => 'Le montant total ne peut pas être zéro',
+    'secure_password'                => 'Ce n’est pas un mot de passe sécurisé. S’il vous plaît essayer de nouveau. Pour plus d’informations, visitez https://goo.gl/NCh2tN',
 ];

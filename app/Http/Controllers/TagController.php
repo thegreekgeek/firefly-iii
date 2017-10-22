@@ -1,24 +1,33 @@
 <?php
 /**
  * TagController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
 use Carbon\Carbon;
-use Exception;
 use FireflyIII\Helpers\Collector\JournalCollectorInterface;
+use FireflyIII\Helpers\Filter\InternalTransferFilter;
 use FireflyIII\Http\Requests\TagFormRequest;
 use FireflyIII\Models\Tag;
-use FireflyIII\Models\Transaction;
 use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 use FireflyIII\Support\CacheProperties;
 use Illuminate\Http\Request;
@@ -26,7 +35,6 @@ use Illuminate\Support\Collection;
 use Navigation;
 use Preferences;
 use Session;
-use URL;
 use View;
 
 /**
@@ -45,9 +53,6 @@ use View;
 class TagController extends Controller
 {
 
-    /** @var array */
-    public $tagOptions = [];
-
     /** @var  TagRepositoryInterface */
     protected $repository;
 
@@ -58,21 +63,13 @@ class TagController extends Controller
     {
         parent::__construct();
         View::share('hideTags', true);
+        $this->redirectUri = route('tags.index');
 
         $this->middleware(
             function ($request, $next) {
                 $this->repository = app(TagRepositoryInterface::class);
-                $this->tagOptions = [
-                    'nothing'        => trans('firefly.regular_tag'),
-                    'balancingAct'   => trans('firefly.balancing_act'),
-                    'advancePayment' => trans('firefly.advance_payment'),
-                ];
-
-
                 View::share('title', strval(trans('firefly.tags')));
                 View::share('mainTitleIcon', 'fa-tags');
-                View::share('tagOptions', $this->tagOptions);
-
 
                 return $next($request);
             }
@@ -80,25 +77,19 @@ class TagController extends Controller
     }
 
     /**
-     * @param Request $request
+     * Create a new tag.
      *
      * @return View
      */
-    public function create(Request $request)
+    public function create()
     {
         $subTitle     = trans('firefly.new_tag');
         $subTitleIcon = 'fa-tag';
         $apiKey       = env('GOOGLE_MAPS_API_KEY', '');
 
-        $preFilled = [
-            'tagMode' => 'nothing',
-        ];
-        if (!$request->old('tagMode')) {
-            Session::flash('preFilled', $preFilled);
-        }
         // put previous url in session if not redirect from store (not "create another").
         if (session('tags.create.fromStore') !== true) {
-            Session::put('tags.create.url', URL::previous());
+            $this->rememberPreviousUri('tags.create.uri');
         }
         Session::forget('tags.create.fromStore');
         Session::flash('gaEventCategory', 'tags');
@@ -108,16 +99,18 @@ class TagController extends Controller
     }
 
     /**
+     * Delete a tag
+     *
      * @param Tag $tag
      *
      * @return View
      */
     public function delete(Tag $tag)
     {
-        $subTitle = trans('breadcrumbs.delete_tag', ['tag' => e($tag->tag)]);
+        $subTitle = trans('breadcrumbs.delete_tag', ['tag' => $tag->tag]);
 
         // put previous url in session
-        Session::put('tags.delete.url', URL::previous());
+        $this->rememberPreviousUri('tags.delete.uri');
         Session::flash('gaEventCategory', 'tags');
         Session::flash('gaEventAction', 'delete');
 
@@ -135,13 +128,15 @@ class TagController extends Controller
         $tagName = $tag->tag;
         $this->repository->destroy($tag);
 
-        Session::flash('success', strval(trans('firefly.deleted_tag', ['tag' => e($tagName)])));
+        Session::flash('success', strval(trans('firefly.deleted_tag', ['tag' => $tagName])));
         Preferences::mark();
 
-        return redirect(route('tags.index'));
+        return redirect($this->getPreviousUri('tags.delete.uri'));
     }
 
     /**
+     * Edit a tag
+     *
      * @param Tag $tag
      *
      * @return View
@@ -152,121 +147,119 @@ class TagController extends Controller
         $subTitleIcon = 'fa-tag';
         $apiKey       = env('GOOGLE_MAPS_API_KEY', '');
 
-        /*
-         * Default tag options (again)
-         */
-        $tagOptions = $this->tagOptions;
-
-        /*
-         * Can this tag become another type?
-         */
-        $allowAdvance        = Tag::tagAllowAdvance($tag);
-        $allowToBalancingAct = Tag::tagAllowBalancing($tag);
-
-        // edit tag options:
-        if ($allowAdvance === false) {
-            unset($tagOptions['advancePayment']);
-        }
-        if ($allowToBalancingAct === false) {
-            unset($tagOptions['balancingAct']);
-        }
-
-
         // put previous url in session if not redirect from store (not "return_to_edit").
         if (session('tags.edit.fromUpdate') !== true) {
-            Session::put('tags.edit.url', URL::previous());
+            $this->rememberPreviousUri('tags.edit.uri');
         }
         Session::forget('tags.edit.fromUpdate');
         Session::flash('gaEventCategory', 'tags');
         Session::flash('gaEventAction', 'edit');
 
-        return view('tags.edit', compact('tag', 'subTitle', 'subTitleIcon', 'tagOptions', 'apiKey'));
+        return view('tags.edit', compact('tag', 'subTitle', 'subTitleIcon', 'apiKey'));
     }
 
     /**
+     * View all tags
      *
-     */
-    public function index()
-    {
-        $title         = 'Tags';
-        $mainTitleIcon = 'fa-tags';
-        $types         = ['nothing', 'balancingAct', 'advancePayment'];
-
-        // loop each types and get the tags, group them by year.
-        $collection = [];
-        foreach ($types as $type) {
-
-            /** @var Collection $tags */
-            $tags = auth()->user()->tags()->where('tagMode', $type)->orderBy('date', 'ASC')->get();
-            $tags = $tags->sortBy(
-                function (Tag $tag) {
-                    $date = !is_null($tag->date) ? $tag->date->format('Ymd') : '000000';
-
-
-                    return strtolower($date . $tag->tag);
-                }
-            );
-
-            /** @var Tag $tag */
-            foreach ($tags as $tag) {
-
-                $year           = is_null($tag->date) ? trans('firefly.no_year') : $tag->date->year;
-                $monthFormatted = is_null($tag->date) ? trans('firefly.no_month') : $tag->date->formatLocalized($this->monthFormat);
-
-                $collection[$type][$year][$monthFormatted][] = $tag;
-            }
-        }
-
-        return view('tags.index', compact('title', 'mainTitleIcon', 'types', 'collection'));
-    }
-
-    /**
-     * @param Request                   $request
-     * @param JournalCollectorInterface $collector
-     * @param Tag                       $tag
+     * @param TagRepositoryInterface $repository
      *
      * @return View
      */
-    public function show(Request $request, JournalCollectorInterface $collector, Tag $tag, string $moment = '')
+    public function index(TagRepositoryInterface $repository)
     {
-        $range = Preferences::get('viewRange', '1M')->data;
+        // start with oldest tag
+        $oldestTag = $repository->oldestTag();
+        /** @var Carbon $start */
         $start = new Carbon;
-        $end   = new Carbon;
-
-        if (strlen($moment) > 0) {
-            try {
-                $start = new Carbon($moment);
-                $end   = Navigation::endOfPeriod($start, $range);
-            } catch (Exception $e) {
-                $start = Navigation::startOfPeriod($this->repository->firstUseDate($tag), $range);
-                $end   = Navigation::startOfPeriod($this->repository->lastUseDate($tag), $range);
-            }
+        if (!is_null($oldestTag)) {
+            /** @var Carbon $start */
+            $start = $oldestTag->date;
         }
-        if (strlen($moment) === 0) {
-            $start = clone session('start', Carbon::now()->startOfMonth());
-            $end   = clone session('end', Carbon::now()->endOfMonth());
+        if (is_null($oldestTag)) {
+            /** @var Carbon $start */
+            $start = clone(session('first'));
         }
 
+        $now               = new Carbon;
+        $clouds            = [];
+        $clouds['no-date'] = $repository->tagCloud(null);
+        while ($now > $start) {
+            $year          = $now->year;
+            $clouds[$year] = $repository->tagCloud($year);
+
+            $now->subYear();
+        }
+        $count = $repository->count();
+
+        return view('tags.index', compact('clouds', 'count'));
+    }
+
+    /**
+     * @param Request                $request
+     * @param TagRepositoryInterface $repository
+     * @param Tag                    $tag
+     * @param string                 $moment
+     *
+     * @return View
+     */
+    public function show(Request $request, TagRepositoryInterface $repository, Tag $tag, string $moment = '')
+    {
+        // default values:
         $subTitle     = $tag->tag;
         $subTitleIcon = 'fa-tag';
-        $page         = intval($request->get('page')) === 0 ? 1 : intval($request->get('page'));
+        $page         = intval($request->get('page'));
         $pageSize     = intval(Preferences::get('transactionPageSize', 50)->data);
-        $periods      = $this->getPeriodOverview($tag);
+        $range        = Preferences::get('viewRange', '1M')->data;
+        $start        = null;
+        $end          = null;
+        $periods      = new Collection;
+        $apiKey       = env('GOOGLE_MAPS_API_KEY', '');
+        $path         = route('tags.show', [$tag->id]);
 
-        // use collector:
-        $collector->setAllAssetAccounts()
-                  ->setLimit($pageSize)->setPage($page)->setTag($tag)
-                  ->withBudgetInformation()->withCategoryInformation()->setRange($start, $end);
+        // prep for "all" view.
+        if ($moment === 'all') {
+            $subTitle = trans('firefly.all_journals_for_tag', ['tag' => $tag->tag]);
+            $start    = $repository->firstUseDate($tag);
+            $end      = new Carbon;
+            $path     = route('tags.show', [$tag->id, 'all']);
+        }
+
+        // prep for "specific date" view.
+        if (strlen($moment) > 0 && $moment !== 'all') {
+            $start    = new Carbon($moment);
+            $end      = Navigation::endOfPeriod($start, $range);
+            $subTitle = trans(
+                'firefly.journals_in_period_for_tag',
+                ['tag'   => $tag->tag,
+                 'start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+            $periods  = $this->getPeriodOverview($tag);
+            $path     = route('tags.show', [$tag->id, $moment]);
+        }
+
+        // prep for current period
+        if (strlen($moment) === 0) {
+            /** @var Carbon $start */
+            $start = clone session('start', Navigation::startOfPeriod(new Carbon, $range));
+            /** @var Carbon $end */
+            $end      = clone session('end', Navigation::endOfPeriod(new Carbon, $range));
+            $periods  = $this->getPeriodOverview($tag);
+            $subTitle = trans(
+                'firefly.journals_in_period_for_tag',
+                ['tag' => $tag->tag, 'start' => $start->formatLocalized($this->monthAndDayFormat), 'end' => $end->formatLocalized($this->monthAndDayFormat)]
+            );
+        }
+
+        /** @var JournalCollectorInterface $collector */
+        $collector = app(JournalCollectorInterface::class);
+        $collector->setAllAssetAccounts()->setRange($start, $end)->setLimit($pageSize)->setPage($page)->withOpposingAccount()
+                  ->setTag($tag)->withBudgetInformation()->withCategoryInformation()->removeFilter(InternalTransferFilter::class);
         $journals = $collector->getPaginatedJournals();
-        $journals->setPath('tags/show/' . $tag->id);
+        $journals->setPath($path);
 
-        $sum = $journals->sum(
-            function (Transaction $transaction) {
-                return $transaction->transaction_amount;
-            }
-        );
+        $sums = $repository->sumsOfTag($tag, $start, $end);
 
-        return view('tags.show', compact('tag', 'periods', 'subTitle', 'subTitleIcon', 'journals', 'sum', 'start', 'end'));
+        return view('tags.show', compact('apiKey', 'tag', 'sums', 'periods', 'subTitle', 'subTitleIcon', 'journals', 'start', 'end', 'moment'));
     }
 
     /**
@@ -279,18 +272,18 @@ class TagController extends Controller
         $data = $request->collectTagData();
         $this->repository->store($data);
 
-        Session::flash('success', strval(trans('firefly.created_tag', ['tag' => e($data['tag'])])));
+        Session::flash('success', strval(trans('firefly.created_tag', ['tag' => $data['tag']])));
         Preferences::mark();
 
         if (intval($request->get('create_another')) === 1) {
-            // set value so create routine will not overwrite URL:
+            // @codeCoverageIgnoreStart
             Session::put('tags.create.fromStore', true);
 
             return redirect(route('tags.create'))->withInput();
+            // @codeCoverageIgnoreEnd
         }
 
-        // redirect to previous URL.
-        return redirect(session('tags.create.url'));
+        return redirect($this->getPreviousUri('tags.create.uri'));
 
     }
 
@@ -305,18 +298,19 @@ class TagController extends Controller
         $data = $request->collectTagData();
         $this->repository->update($tag, $data);
 
-        Session::flash('success', strval(trans('firefly.updated_tag', ['tag' => e($data['tag'])])));
+        Session::flash('success', strval(trans('firefly.updated_tag', ['tag' => $data['tag']])));
         Preferences::mark();
 
         if (intval($request->get('return_to_edit')) === 1) {
-            // set value so edit routine will not overwrite URL:
+            // @codeCoverageIgnoreStart
             Session::put('tags.edit.fromUpdate', true);
 
             return redirect(route('tags.edit', [$tag->id]))->withInput(['return_to_edit' => 1]);
+            // @codeCoverageIgnoreEnd
         }
 
         // redirect to previous URL.
-        return redirect(session('tags.edit.url'));
+        return redirect($this->getPreviousUri('tags.edit.uri'));
     }
 
     /**
@@ -338,7 +332,7 @@ class TagController extends Controller
         $cache->addProperty($tag->id);
 
         if ($cache->has()) {
-            return $cache->get();
+            return $cache->get(); // @codeCoverageIgnore
         }
 
         $collection = new Collection;
@@ -349,11 +343,11 @@ class TagController extends Controller
 
             // get expenses and what-not in this period and this tag.
             $arr = [
-                'date_string' => $end->format('Y-m-d'),
-                'date_name'   => Navigation::periodShow($end, $range),
-                'date'        => $end,
-                'spent'       => $this->repository->spentInperiod($tag, $end, $currentEnd),
-                'earned'      => $this->repository->earnedInperiod($tag, $end, $currentEnd),
+                'string' => $end->format('Y-m-d'),
+                'name'   => Navigation::periodShow($end, $range),
+                'date'   => clone $end,
+                'spent'  => $this->repository->spentInperiod($tag, $end, $currentEnd),
+                'earned' => $this->repository->earnedInperiod($tag, $end, $currentEnd),
             ];
             $collection->push($arr);
 
@@ -364,4 +358,6 @@ class TagController extends Controller
         return $collection;
 
     }
+
+
 }

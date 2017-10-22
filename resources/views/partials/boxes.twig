@@ -1,63 +1,79 @@
-{# Set box sizes: #}
-{% if billCount > 0 %}
-    {% set boxClasses = 'col-lg-3 col-md-3 col-sm-6 col-xs-12' %}
-{% else %}
-    {# Zero bills? Remove the boxes. #}
-    {% set boxClasses = 'col-lg-4 col-md-4 col-sm-6 col-xs-12' %}
-{% endif %}
-
-<!-- Info boxes -->
 <div class="row hidden-sm hidden-xs">
-    <div class="{{ boxClasses }}">
-        <div class="info-box">
-            <span class="info-box-icon bg-red">
-                <i class="fa fa-upload fa-fw"></i>
-            </span>
+
+    {# box for in and out#}
+    <div class="col-lg-3 col-md-3 col-sm-6 col-xs-12">
+        <div class="info-box bg-aqua-gradient" id="box_out_holder">
+            <span class="info-box-icon"><i class="fa fa-balance-scale"></i></span>
 
             <div class="info-box-content">
-                <span class="info-box-text">{{ 'moneyOut'|_ }}</span>
-                <span class="info-box-number" id="box-out"></span>
+                <span class="info-box-text">{{ 'balance'|_ }}</span>
+                <span class="info-box-number" id="box-balance-total"></span>
+
+                <div class="progress">
+                    <div class="progress-bar" style="width: 0%"></div>
+                </div>
+                <span class="progress-description">
+                    <span title="{{ 'expenses'|_ }}" id="box-balance-out"></span> / <span title="{{ 'income'|_ }}" id="box-balance-in"></span>
+                  </span>
             </div>
         </div>
     </div>
-    <div class="{{ boxClasses }}">
-        <div class="info-box">
-            <span class="info-box-icon bg-green">
-                <i class="fa fa-download faw-fw"></i>
-            </span>
+
+    {# box for bills #}
+    <div class="col-lg-3 col-md-3 col-sm-6 col-xs-12">
+        <div class="info-box bg-teal-gradient">
+            <span class="info-box-icon"><i class="fa fa-calendar-o"></i></span>
 
             <div class="info-box-content">
-                <span class="info-box-text">{{ 'moneyIn'|_ }}</span>
-                <span class="info-box-number" id="box-in"></span>
+                <span class="info-box-text">{{ 'bills_to_pay'|_ }}</span>
+                <span class="info-box-number" id="box-bills-unpaid"></span>
+
+                <div class="progress">
+                    <div class="progress-bar" style="width: 0%"></div>
+                </div>
+                <span class="progress-description">
+                    {{ 'paid'|_ }}:
+                    <span title="{{ 'bills_paid'|_ }}" id="box-bills-paid"></span>
+                  </span>
             </div>
         </div>
     </div>
-    {% if billCount > 0 %}
-        <div class="clearfix visible-sm-block"></div>
 
-        <div class="{{ boxClasses }}">
-            <div class="info-box">
-            <span class="info-box-icon bg-blue">
-                <i class="fa fa-calendar fa-fw"></i>
-            </span>
+    {#  available to spend total / per day #}
+    <div class="col-lg-3 col-md-3 col-sm-6 col-xs-12">
+        <div class="info-box bg-green-gradient">
+            <span class="info-box-icon"><i class="fa fa-money"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text">{{ 'left_to_spend'|_ }}</span>
+                <span class="info-box-number" id="box-left-to-spend"></span>
 
-                <div class="info-box-content">
-                    <span class="info-box-text">{{ 'billsToPay'|_ }}</span>
-                    <span class="info-box-number" id="box-bills-unpaid"></span>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 0%"></div>
                 </div>
+                <span class="progress-description">
+                    {{ 'per_day'|_ }}:
+                    <span title="{{ 'left_to_spend_per_day'|_ }}" id="box-left-per-day"></span>
+                  </span>
             </div>
         </div>
-        <div class="{{ boxClasses }}">
-            <div class="info-box">
-            <span class="info-box-icon bg-aqua">
-                <i class="fa fa-line-chart fa-fw"></i>
-            </span>
+    </div>
 
-                <div class="info-box-content">
-                    <span class="info-box-text">{{ 'billsPaid'|_ }}</span>
-                    <span class="info-box-number" id="box-bills-paid"></span>
+    {# net worth #}
+    <div class="col-lg-3 col-md-3 col-sm-6 col-xs-12">
+        <div class="info-box bg-blue-gradient">
+            <span class="info-box-icon"><i class="fa fa-line-chart"></i></span>
+
+            <div class="info-box-content">
+                <span class="info-box-text">{{ 'net_worth'|_ }}</span>
+                <span class="info-box-number" id="box-net-worth"></span>
+
+                <div class="progress">
+                    <div class="progress-bar" style="width: 0%"></div>
                 </div>
+                <span class="progress-description">
+                    <span title="{{ 'net_worth'|_ }}" id="box-clear"></span>
+                  </span>
             </div>
         </div>
-    {% endif %}
+    </div>
 </div>

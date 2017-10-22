@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 /**
  * form.php
  * Copyright (C) 2016 thegrumpydictator@gmail.com
@@ -28,12 +30,10 @@ return [
     'currency_id'                    => 'Währung',
     'attachments'                    => 'Anhänge',
     'journal_amount'                 => 'Betrag',
-    'journal_asset_source_account'   => 'Girokonto (Quelle)',
     'journal_source_account_name'    => 'Kreditor (Quelle)',
     'journal_source_account_id'      => 'Girokonto (Quelle)',
     'BIC'                            => 'BIC',
-    'account_from_id'                => 'Vom Konto',
-    'account_to_id'                  => 'Auf Konto',
+    'verify_password'                => 'Überprüfen Sie die Kennwortsicherheit',
     'source_account'                 => 'Quellkonto',
     'destination_account'            => 'Zielkonto',
     'journal_destination_account_id' => 'Girokonto (Ziel)',
@@ -48,9 +48,8 @@ return [
     'budget_id'                      => 'Budget',
     'openingBalance'                 => 'Eröffnungsbilanz',
     'tagMode'                        => 'Tag-Modus',
-    'tagPosition'                    => 'Ort des Tags',
+    'tag_position'                    => 'Tag location',
     'virtualBalance'                 => 'Virtueller Kontostand',
-    'longitude_latitude'             => 'Standort',
     'targetamount'                   => 'Zielbetrag',
     'accountRole'                    => 'Rolle des Kontos',
     'openingBalanceDate'             => 'Eröffnungsbilanzdatum',
@@ -63,16 +62,22 @@ return [
     'description'                    => 'Beschreibung',
     'expense_account'                => 'Debitor (Ausgabe)',
     'revenue_account'                => 'Kreditor (Einnahme)',
-    'decimal_places'                 => 'Decimal places',
+    'decimal_places'                 => 'Nachkommastellen',
+    'exchange_rate_instruction'      => 'Ausländische Währungen',
+    'source_amount'                  => 'Betrag (Quelle)',
+    'destination_amount'             => 'Betrag (Ziel)',
+    'native_amount'                  => 'Nativer Betrag',
+    'new_email_address'              => 'New email address',
+    'verification'                   => 'Verification',
+    'api_key'                        => 'API key',
 
-    'revenue_account_source'      => 'Ertragskonto (Quelle)',
     'source_account_asset'        => 'Quellkonto (Bestandskonto)',
     'destination_account_expense' => 'Zielkonto (Unkostenkonto)',
     'destination_account_asset'   => 'Zielkonto (Bestandskonto)',
     'source_account_revenue'      => 'Quellkonto (Ertragskonto)',
     'type'                        => 'Type',
     'convert_Withdrawal'          => 'Ändere zu Abhebung',
-    'convert_Deposit'             => 'Ändere zu Einzahlng',
+    'convert_Deposit'             => 'Ändere zu Einzahlung',
     'convert_Transfer'            => 'Ändere zu Überweisung',
 
 
@@ -92,6 +97,7 @@ return [
     'code'                       => 'Code',
     'iban'                       => 'IBAN',
     'accountNumber'              => 'Kontonummer',
+    'creditCardNumber'           => 'Credit card number',
     'has_headers'                => 'Kopfzeilen',
     'date_format'                => 'Datumsformat',
     'specifix'                   => 'Bank- oder Dateispezifischer Korrekturen',
@@ -102,7 +108,6 @@ return [
     'add_new_withdrawal'         => 'Fügen Sie eine neue Ausgabe hinzu',
     'add_new_deposit'            => 'Fügen Sie eine neue Einnahme hinzu',
     'add_new_transfer'           => 'Fügen Sie eine neue Überweisung hinzu',
-    'noPiggybank'                => '(kein Sparschwein)',
     'title'                      => 'Titel',
     'notes'                      => 'Notizen',
     'filename'                   => 'Dateiname',
@@ -127,6 +132,9 @@ return [
     'delete_attachment'          => 'Lösche Anhang ":name"',
     'delete_rule'                => 'Lösche Regel ":title"',
     'delete_rule_group'          => 'Lösche Regelgruppe ":title"',
+    'delete_link_type'           => 'Delete link type ":name"',
+    'delete_user'                => 'Delete user ":email"',
+    'user_areYouSure'            => 'If you delete user ":email", everything will be gone. There is no undo, undelete or anything. If you delete yourself, you will lose access to this instance of Firefly III.',
     'attachment_areYouSure'      => 'Sind Sie sicher, dass Sie den Anhang ":name" löschen möchten?',
     'account_areYouSure'         => 'Sind Sie sicher, dass Sie das Konto ":name" löschen möchten?',
     'bill_areYouSure'            => 'Sind Sie sicher, dass Sie die Rechnung ":name" löschen möchten?',
@@ -139,11 +147,14 @@ return [
     'journal_areYouSure'         => 'Sind Sie sicher, dass Sie die Überweisung mit dem Namen ":description" löschen möchten?',
     'mass_journal_are_you_sure'  => 'Sind Sie sicher, dass Sie diese Überweisung löschen möchten?',
     'tag_areYouSure'             => 'Sind Sie sicher, dass Sie den Tag ":name" löschen möchten?',
+    'journal_link_areYouSure'    => 'Bist du sicher, dass du die Verknüpfung zwischen <a href=":source_link">:source</a> und <a href=":destination_link">:destination</a> löschen möchtest?',
+    'linkType_areYouSure'        => 'Are you sure you want to delete the link type ":name" (":inward" / ":outward")?',
     'permDeleteWarning'          => 'Das Löschen von Dingen in Firefly ist dauerhaft und kann nicht rückgängig gemacht werden.',
-    'mass_make_selection'        => 'Sie können das Löschen von Elementen verhinden, indem Sie die Checkbox entfernen.',
+    'mass_make_selection'        => 'Sie können das Löschen von Elementen verhindern, indem Sie die Checkbox entfernen.',
     'delete_all_permanently'     => 'Ausgewähltes dauerhaft löschen',
     'update_all_journals'        => 'Diese Transaktionen aktualisieren',
     'also_delete_transactions'   => 'Die einzige Überweisung, die mit diesem Konto verknüpft ist, wird ebenfalls gelöscht. | Alle :count Überweisungen, die mit diesem Konto verknüpft sind, werden ebenfalls gelöscht.',
+    'also_delete_connections'    => 'The only transaction linked with this link type will lose this connection.|All :count transactions linked with this link type will lose their connection.',
     'also_delete_rules'          => 'Die einzige Regel, die mit diesem Konto verknüpft ist, wird ebenfalls gelöscht. | Alle :count Regeln, die mit diesem Konto verknüpft sind, werden ebenfalls gelöscht.',
     'also_delete_piggyBanks'     => 'Das einzige Sparschwein, das mit diesem Konto verknüpft ist, wird ebenfalls gelöscht. | Alle :count Sparschweine, die mit diesem Konto verknüpft sind, werden ebenfalls gelöscht.',
     'bill_keep_transactions'     => 'Die einzige Überweisung, die mit dieser Rechnung verknüpft ist, wird nicht gelöscht. | Keine der :count Überweisungen, die mit dieser Rechnung verknüpft sind, werden gelöscht.',
@@ -151,17 +162,16 @@ return [
     'category_keep_transactions' => 'Die eine Überweisungen, die mit dieser Kategorie verknüpft ist, wird nicht gelöscht. | Keine der :count Kategorien, die mit dieser Rechnung verknüpft sind, werden gelöscht.',
     'tag_keep_transactions'      => 'Die einzige Überweisung, die mit diesem Tag verknüpft ist, wird nicht gelöscht. | Keiner der :count Tags, die mit dieser Rechnung verknüpft sind, werden gelöscht.',
 
-    'email'                 => 'Email address',
-    'password'              => 'Password',
-    'password_confirmation' => 'Password (again)',
-    'blocked'               => 'Is blocked?',
-    'blocked_code'          => 'Reason for block',
+    'email'                 => 'E-Mail Adresse',
+    'password'              => 'Passwort',
+    'password_confirmation' => 'Passwort (nochmal)',
+    'blocked'               => 'Ist blockiert?',
+    'blocked_code'          => 'Grund für Block',
 
 
     // admin
     'domain'                => 'Domain',
     'single_user_mode'      => 'Einzelnutzermodus',
-    'must_confirm_account'  => 'Erstanwender müssen ihr Konto aktivieren',
     'is_demo_site'          => 'Ist eine Demonstrationsseite',
 
 
@@ -181,4 +191,7 @@ return [
     'payment_date'       => 'Zahlungsdatum',
     'invoice_date'       => 'Rechnungsdatum',
     'internal_reference' => 'Interner Verweis',
+    'inward'             => 'Inward description',
+    'outward'            => 'Outward description',
+    'rule_group_id'      => 'Rule group',
 ];

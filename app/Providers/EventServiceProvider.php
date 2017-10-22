@@ -1,15 +1,25 @@
 <?php
 /**
  * EventServiceProvider.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Providers;
 
@@ -36,32 +46,39 @@ class EventServiceProvider extends ServiceProvider
      */
     protected $listen
         = [
-            // new event handlers:
-            'FireflyIII\Events\RegisteredUser'            => // is a User related event.
+            // is a User related event.
+            'FireflyIII\Events\RegisteredUser'            =>
                 [
                     'FireflyIII\Handlers\Events\UserEventHandler@sendRegistrationMail',
                     'FireflyIII\Handlers\Events\UserEventHandler@attachUserRole',
                 ],
-            'FireflyIII\Events\RequestedNewPassword'      => [ // is a User related event.
-                                                               'FireflyIII\Handlers\Events\UserEventHandler@sendNewPassword',
+            // is a User related event.
+            'FireflyIII\Events\RequestedNewPassword'      => [
+                'FireflyIII\Handlers\Events\UserEventHandler@sendNewPassword',
             ],
-            'FireflyIII\Events\StoredTransactionJournal'  => // is a Transaction Journal related event.
+            // is a User related event.
+            'FireflyIII\Events\UserChangedEmail'          => [
+                'FireflyIII\Handlers\Events\UserEventHandler@sendEmailChangeConfirmMail',
+                'FireflyIII\Handlers\Events\UserEventHandler@sendEmailChangeUndoMail',
+            ],
+            // admin related
+            'FireflyIII\Events\AdminRequestedTestMessage' => [
+                'FireflyIII\Handlers\Events\AdminEventHandler@sendTestMessage',
+            ],
+            // is a Transaction Journal related event.
+            'FireflyIII\Events\StoredTransactionJournal'  =>
                 [
                     'FireflyIII\Handlers\Events\StoredJournalEventHandler@scanBills',
                     'FireflyIII\Handlers\Events\StoredJournalEventHandler@connectToPiggyBank',
                     'FireflyIII\Handlers\Events\StoredJournalEventHandler@processRules',
                 ],
-            'FireflyIII\Events\UpdatedTransactionJournal' => // is a Transaction Journal related event.
+            // is a Transaction Journal related event.
+            'FireflyIII\Events\UpdatedTransactionJournal' =>
                 [
                     'FireflyIII\Handlers\Events\UpdatedJournalEventHandler@scanBills',
                     'FireflyIII\Handlers\Events\UpdatedJournalEventHandler@processRules',
                 ],
 
-            // LARAVEL EVENTS:
-            'Illuminate\Auth\Events\Logout'               =>
-                [
-                    'FireflyIII\Handlers\Events\UserEventHandler@logoutUser',
-                ],
         ];
 
     /**

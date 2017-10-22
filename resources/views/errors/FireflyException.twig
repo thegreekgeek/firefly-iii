@@ -2,15 +2,15 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="robots" content="noindex, nofolllow, noarchive, noodp, NoImageIndex, noydir">
+    <meta name="robots" content="noindex, nofollow, noarchive, noodp, NoImageIndex, noydir">
     <title>Firefly III</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no' name='viewport'>
     <base href="{{ route('index') }}/">
-    <link rel="stylesheet" href="lib/bootstrap/css/bootstrap.min.css" type="text/css" media="all"/>
-    <link rel="stylesheet" href="lib/font-awesome/css/font-awesome.min.css" type="text/css" media="all"/>
-    <link href="lib/adminlte/css/AdminLTE.min.css" rel="stylesheet" type="text/css"/>
-    <link href="css/firefly.css" rel="stylesheet" type="text/css"/>
+    <link rel="stylesheet" href="lib/bootstrap/css/bootstrap.min.css?v={{ FF_VERSION }}" type="text/css" media="all"/>
+    <link rel="stylesheet" href="lib/font-awesome/css/font-awesome.min.css?v={{ FF_VERSION }}" type="text/css" media="all"/>
+    <link href="lib/adminlte/css/AdminLTE.min.css?v={{ FF_VERSION }}" rel="stylesheet" type="text/css"/>
+    <link href="css/firefly.css?v={{ FF_VERSION }}" rel="stylesheet" type="text/css"/>
 
     {# favicons #}
     {% include('partials.favicons') %}
@@ -38,6 +38,20 @@
             </p>
         </div>
     </div>
+    {% if not debug %}
+        <div class="row">
+            <div class="col-lg-12 col-md-12 col-sm-12">
+                <p>
+                    More information about this error may be available in the log files. Search for the error above and a stack trace
+                    will appear. This stack trace may help you track down what's going wrong.
+                </p>
+                <p>
+                    If you cannot find the cause of this error or when you need some help, please open a ticket on
+                    <strong><a href="https://github.com/firefly-iii/firefly-iii/issues">Github</a></strong>.
+                </p>
+            </div>
+        </div>
+    {% endif %}
 </div>
 
 {% if debug %}
@@ -51,5 +65,6 @@
         </div>
     </div>
 {% endif %}
+
 </body>
 </html>

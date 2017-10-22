@@ -28,14 +28,15 @@
                                     <option label="{{ 'report_type_audit'|_ }}" value="audit">{{ 'report_type_audit'|_ }}</option>
                                     <option label="{{ 'report_type_budget'|_ }}" value="budget">{{ 'report_type_budget'|_ }}</option>
                                     <option label="{{ 'report_type_category'|_ }}" value="category">{{ 'report_type_category'|_ }}</option>
+                                    <option label="{{ 'report_type_tag'|_ }}" value="tag">{{ 'report_type_tag'|_ }}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="form-group">
                             <label for="inputAccounts" class="col-sm-3 control-label">{{ 'report_included_accounts'|_ }}</label>
 
-                            <div class="col-sm-9">
-                                <select id="inputAccounts" name="accounts[]" multiple="multiple" class="form-control">
+                            <div class="col-sm-9" id="inputAccountsSelect">
+                                <select id="inputAccounts" name="accounts[]" multiple class="form-control">
                                     {% for account in accounts %}
                                         <option
                                                 value="{{ account.id }}"
@@ -152,48 +153,6 @@
                             <a href="{{ route('reports.report.audit',[accountList, start.format('Ymd'),'currentMonthEnd']) }}">{{ 'report_all_time_quick'|_ }}</a>
                         </li>
                     </ul>
-                    {#<h4>{{ ('quick_link_category_report')|_ }}</h4>#}
-
-
-                    {#
-
-                    {% for type in ['default','audit'] %}
-
-
-                        <ul>
-                            <li>
-
-                            </li>
-                            <li>
-                                <a href="{{ route('reports.report.'~type,
-                                [
-                                'currentYearStart',
-                                'currentYearEnd',
-                                accountList
-                                ]) }}">{{ 'report_this_year_quick'|_ }}</a>
-                            </li>
-                            {% if customFiscalYear == 1 %}
-                                <li>
-                                    <a href="{{ route('reports.report.'~type,
-                                    ['default',
-                                    'currentFiscalYearStart',
-                                    'currentFiscalYearEnd',
-                                    accountList
-                                    ]) }}">{{ 'report_this_fiscal_year_quick'|_ }}</a>
-                                </li>
-                            {% endif %}
-                            <li>
-                                <a href="{{ route('reports.report.'~type,
-                                [
-                                start.format('Ymd'),
-                                'currentMonthEnd',
-                                accountList
-                                ]) }}">{{ 'report_all_time_quick'|_ }}</a>
-                            </li>
-                        </ul>
-                    {% endfor %}
-                    #}
-
                     <p>
                         <em>{{ 'reports_can_bookmark'|_ }}</em>
                     </p>
@@ -202,11 +161,12 @@
 
         </div>
     </div>
+    <div style="height:400px;">&nbsp;</div>
 
 {% endblock %}
 
 {% block styles %}
-    <link href="css/bootstrap-multiselect.css" rel="stylesheet" type="text/css"/>
+    <link href="css/bootstrap-multiselect.css?v={{ FF_VERSION }}" rel="stylesheet" type="text/css"/>
 {% endblock %}
 
 {% block scripts %}
@@ -217,6 +177,6 @@
         var allSelectedText = "{{ 'multi_select_all_selected'|_ }}";
         var filterPlaceholder = "{{ 'multi_select_filter_placeholder'|_ }}";
     </script>
-    <script type="text/javascript" src="js/lib/bootstrap-multiselect.js"></script>
-    <script type="text/javascript" src="js/ff/reports/index.js"></script>
+    <script type="text/javascript" src="js/lib/bootstrap-multiselect.js?v={{ FF_VERSION }}"></script>
+    <script type="text/javascript" src="js/ff/reports/index.js?v={{ FF_VERSION }}"></script>
 {% endblock %}

@@ -1,18 +1,28 @@
 <?php
 /**
  * TagFormRequest.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 namespace FireflyIII\Http\Requests;
 
-use Carbon\Carbon;
 use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 
 /**
@@ -37,25 +47,23 @@ class TagFormRequest extends Request
      */
     public function collectTagData(): array
     {
-        if ($this->get('setTag') == 'true') {
-            $latitude  = $this->string('latitude');
-            $longitude = $this->string('longitude');
-            $zoomLevel = $this->integer('zoomLevel');
-        } else {
-            $latitude  = null;
-            $longitude = null;
-            $zoomLevel = null;
+        $latitude  = null;
+        $longitude = null;
+        $zoomLevel = null;
+
+        if ($this->get('tag_position_has_tag') === 'true') {
+            $latitude  = $this->string('tag_position_latitude');
+            $longitude = $this->string('tag_position_longitude');
+            $zoomLevel = $this->integer('tag_position_zoomlevel');
         }
-        $date = $this->get('date') ?? '';
 
         $data = [
             'tag'         => $this->string('tag'),
-            'date'        => $this->date($date),
+            'date'        => $this->date('date'),
             'description' => $this->string('description'),
             'latitude'    => $latitude,
             'longitude'   => $longitude,
             'zoomLevel'   => $zoomLevel,
-            'tagMode'     => $this->string('tagMode'),
         ];
 
         return $data;
@@ -80,12 +88,11 @@ class TagFormRequest extends Request
         return [
             'tag'         => $tagRule,
             'id'          => $idRule,
-            'description' => 'min:1',
-            'date'        => 'date',
-            'latitude'    => 'numeric|min:-90|max:90',
-            'longitude'   => 'numeric|min:-90|max:90',
-            'zoomLevel'   => 'numeric|min:0|max:80',
-            'tagMode'     => 'required|in:nothing,balancingAct,advancePayment',
+            'description' => 'min:1|nullable',
+            'date'        => 'date|nullable',
+            'latitude'    => 'numeric|min:-90|max:90|nullable',
+            'longitude'   => 'numeric|min:-90|max:90|nullable',
+            'zoomLevel'   => 'numeric|min:0|max:80|nullable',
         ];
     }
 }

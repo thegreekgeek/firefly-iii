@@ -1,18 +1,29 @@
 <?php
 /**
  * app.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
+
 
 return [
-    'name'            => 'Firefly III',
+    'name'            => env('APP_NAME', 'Firefly III'),
     'env'             => env('APP_ENV', 'production'),
     'debug'           => env('APP_DEBUG', false),
     'url'             => env('APP_URL', 'http://localhost'),
@@ -21,7 +32,7 @@ return [
     'fallback_locale' => 'en_US',
     'key'             => env('APP_KEY'),
     'cipher'          => 'AES-256-CBC',
-    'log'             => env('APP_LOG', 'daily'),
+    'log'             => env('APP_LOG', 'errorlog'),
     'log_level'       => env('APP_LOG_LEVEL', 'info'),
     'providers'       => [
 
@@ -50,8 +61,10 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
-        Collective\Html\HtmlServiceProvider::class,
 
+        /*
+         * Package Service Providers...
+         */
 
         /*
          * Application Service Providers...
@@ -61,20 +74,17 @@ return [
         // FireflyIII\Providers\BroadcastServiceProvider::class,
         FireflyIII\Providers\EventServiceProvider::class,
         FireflyIII\Providers\RouteServiceProvider::class,
-        FireflyIII\Providers\FireflyServiceProvider::class,
-
 
         // own stuff:
         //Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider::class,
         //Barryvdh\Debugbar\ServiceProvider::class,
         DaveJamesMiller\Breadcrumbs\ServiceProvider::class,
         TwigBridge\ServiceProvider::class,
-        'PragmaRX\Google2FA\Vendor\Laravel\ServiceProvider',
+        PragmaRX\Google2FA\Vendor\Laravel\ServiceProvider::class,
 
         /*
          * More service providers.
         */
-        FireflyIII\Providers\CrudServiceProvider::class,
         FireflyIII\Providers\AccountServiceProvider::class,
         FireflyIII\Providers\AttachmentServiceProvider::class,
         FireflyIII\Providers\BillServiceProvider::class,
@@ -82,12 +92,14 @@ return [
         FireflyIII\Providers\CategoryServiceProvider::class,
         FireflyIII\Providers\CurrencyServiceProvider::class,
         FireflyIII\Providers\ExportJobServiceProvider::class,
+        FireflyIII\Providers\FireflyServiceProvider::class,
         FireflyIII\Providers\JournalServiceProvider::class,
         FireflyIII\Providers\PiggyBankServiceProvider::class,
         FireflyIII\Providers\RuleServiceProvider::class,
         FireflyIII\Providers\RuleGroupServiceProvider::class,
         FireflyIII\Providers\SearchServiceProvider::class,
         FireflyIII\Providers\TagServiceProvider::class,
+        FireflyIII\Providers\AdminServiceProvider::class,
 
 
     ],
@@ -97,6 +109,8 @@ return [
         'Artisan'       => Illuminate\Support\Facades\Artisan::class,
         'Auth'          => Illuminate\Support\Facades\Auth::class,
         'Blade'         => Illuminate\Support\Facades\Blade::class,
+        'Broadcast'     => Illuminate\Support\Facades\Broadcast::class,
+        'Bus'           => Illuminate\Support\Facades\Bus::class,
         'Cache'         => Illuminate\Support\Facades\Cache::class,
         'Config'        => Illuminate\Support\Facades\Config::class,
         'Cookie'        => Illuminate\Support\Facades\Cookie::class,
@@ -124,19 +138,17 @@ return [
         'URL'           => Illuminate\Support\Facades\URL::class,
         'Validator'     => Illuminate\Support\Facades\Validator::class,
         'View'          => Illuminate\Support\Facades\View::class,
-        'Twig'          => 'TwigBridge\Facade\Twig',
+        'Twig'          => TwigBridge\Facade\Twig::class,
         'Form'          => Collective\Html\FormFacade::class,
         'Html'          => Collective\Html\HtmlFacade::class,
-        'Breadcrumbs'   => 'DaveJamesMiller\Breadcrumbs\Facade',
-        'Preferences'   => 'FireflyIII\Support\Facades\Preferences',
-        'FireflyConfig' => 'FireflyIII\Support\Facades\FireflyConfig',
-        'Navigation'    => 'FireflyIII\Support\Facades\Navigation',
-        'Amount'        => 'FireflyIII\Support\Facades\Amount',
-        'Steam'         => 'FireflyIII\Support\Facades\Steam',
-        'ExpandedForm'  => 'FireflyIII\Support\Facades\ExpandedForm',
-        'Entrust'       => 'Zizaco\Entrust\EntrustFacade',
-        'Input'         => 'Illuminate\Support\Facades\Input',
-        'Google2FA'     => 'PragmaRX\Google2FA\Vendor\Laravel\Facade',
+        'Breadcrumbs'   => DaveJamesMiller\Breadcrumbs\Facade::class,
+        'Preferences'   => \FireflyIII\Support\Facades\Preferences::class,
+        'FireflyConfig' => \FireflyIII\Support\Facades\FireflyConfig::class,
+        'Navigation'    => \FireflyIII\Support\Facades\Navigation::class,
+        'Amount'        => \FireflyIII\Support\Facades\Amount::class,
+        'Steam'         => \FireflyIII\Support\Facades\Steam::class,
+        'ExpandedForm'  => \FireflyIII\Support\Facades\ExpandedForm::class,
+        'Google2FA'     => PragmaRX\Google2FA\Vendor\Laravel\Facade::class,
     ],
 
 ];

@@ -1,15 +1,25 @@
 <?php
 /**
  * csv.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 
 return [
@@ -21,6 +31,7 @@ return [
         'IngDescription'      => 'FireflyIII\Import\Specifics\IngDescription',
         'RabobankDescription' => 'FireflyIII\Import\Specifics\RabobankDescription',
         'AbnAmroDescription'  => 'FireflyIII\Import\Specifics\AbnAmroDescription',
+        'SnsDescription'      => 'FireflyIII\Import\Specifics\SnsDescription',
         'PresidentsChoice'    => 'FireflyIII\Import\Specifics\PresidentsChoice',
     ],
 
@@ -191,7 +202,7 @@ return [
             'mapper'          => 'Categories',
         ],
         'tags-comma'        => [
-            'mappable'           => true,
+            'mappable'           => false,
             'pre-process-map'    => true,
             'pre-process-mapper' => 'TagsComma',
             'field'              => 'tags',
@@ -199,7 +210,7 @@ return [
             'mapper'             => 'Tags',
         ],
         'tags-space'        => [
-            'mappable'           => true,
+            'mappable'           => false,
             'pre-process-map'    => true,
             'pre-process-mapper' => 'TagsSpace',
             'field'              => 'tags',
@@ -292,6 +303,7 @@ return [
     // number of example rows:
     'example_rows'     => 5,
     'default_config'   => [
+        'initial-config-complete' => false,
         'has-headers'             => false, // assume
         'date-format'             => 'Ymd', // assume
         'delimiter'               => ',', // assume

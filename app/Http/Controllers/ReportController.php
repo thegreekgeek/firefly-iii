@@ -1,29 +1,41 @@
 <?php
 /**
  * ReportController.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers;
 
 use Carbon\Carbon;
-use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Generator\Report\ReportGeneratorFactory;
 use FireflyIII\Helpers\Report\ReportHelperInterface;
 use FireflyIII\Http\Requests\ReportFormRequest;
 use FireflyIII\Models\AccountType;
+use FireflyIII\Models\Tag;
 use FireflyIII\Repositories\Account\AccountRepositoryInterface;
 use FireflyIII\Repositories\Budget\BudgetRepositoryInterface;
 use FireflyIII\Repositories\Category\CategoryRepositoryInterface;
+use FireflyIII\Repositories\Tag\TagRepositoryInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Log;
 use Preferences;
 use Response;
 use Session;
@@ -46,14 +58,13 @@ class ReportController extends Controller
     {
         parent::__construct();
 
+        $this->helper = app(ReportHelperInterface::class);
 
         $this->middleware(
             function ($request, $next) {
                 View::share('title', trans('firefly.reports'));
                 View::share('mainTitleIcon', 'fa-line-chart');
                 View::share('subTitleIcon', 'fa-calendar');
-
-                $this->helper = app(ReportHelperInterface::class);
 
                 return $next($request);
             }
@@ -71,7 +82,7 @@ class ReportController extends Controller
     public function auditReport(Collection $accounts, Carbon $start, Carbon $end)
     {
         if ($end < $start) {
-            return view('error')->with('message', trans('firefly.end_after_start_date'));
+            return view('error')->with('message', trans('firefly.end_after_start_date')); // @codeCoverageIgnore
         }
         if ($start < session('first')) {
             $start = session('first');
@@ -107,7 +118,7 @@ class ReportController extends Controller
     public function budgetReport(Collection $accounts, Collection $budgets, Carbon $start, Carbon $end)
     {
         if ($end < $start) {
-            return view('error')->with('message', trans('firefly.end_after_start_date'));
+            return view('error')->with('message', trans('firefly.end_after_start_date')); // @codeCoverageIgnore
         }
         if ($start < session('first')) {
             $start = session('first');
@@ -143,7 +154,7 @@ class ReportController extends Controller
     public function categoryReport(Collection $accounts, Collection $categories, Carbon $start, Carbon $end)
     {
         if ($end < $start) {
-            return view('error')->with('message', trans('firefly.end_after_start_date'));
+            return view('error')->with('message', trans('firefly.end_after_start_date')); // @codeCoverageIgnore
         }
         if ($start < session('first')) {
             $start = session('first');
@@ -238,6 +249,9 @@ class ReportController extends Controller
             case 'budget':
                 $result = $this->budgetReportOptions();
                 break;
+            case 'tag':
+                $result = $this->tagReportOptions();
+                break;
         }
 
         return Response::json(['html' => $result]);
@@ -246,10 +260,9 @@ class ReportController extends Controller
     /**
      * @param ReportFormRequest $request
      *
-     * @return RedirectResponse
-     * @throws FireflyException
+     * @return RedirectResponse|\Illuminate\Routing\Redirector
      */
-    public function postIndex(ReportFormRequest $request): RedirectResponse
+    public function postIndex(ReportFormRequest $request)
     {
         // report type:
         $reportType = $request->get('report_type');
@@ -258,8 +271,11 @@ class ReportController extends Controller
         $accounts   = join(',', $request->getAccountList()->pluck('id')->toArray());
         $categories = join(',', $request->getCategoryList()->pluck('id')->toArray());
         $budgets    = join(',', $request->getBudgetList()->pluck('id')->toArray());
+        $tags       = join(',', $request->getTagList()->pluck('tag')->toArray());
+        $uri        = route('reports.index');
 
         if ($request->getAccountList()->count() === 0) {
+            Log::debug('Account count is zero');
             Session::flash('error', trans('firefly.select_more_than_one_account'));
 
             return redirect(route('reports.index'));
@@ -277,18 +293,17 @@ class ReportController extends Controller
             return redirect(route('reports.index'));
         }
 
+        if ($request->getTagList()->count() === 0 && $reportType === 'tag') {
+            Session::flash('error', trans('firefly.select_more_than_one_tag'));
+
+            return redirect(route('reports.index'));
+        }
+
         if ($end < $start) {
             return view('error')->with('message', trans('firefly.end_after_start_date'));
         }
 
-        // lower threshold
-        if ($start < session('first')) {
-            $start = session('first');
-        }
-
         switch ($reportType) {
-            default:
-                throw new FireflyException(sprintf('Firefly does not support the "%s"-report yet.', $reportType));
             case 'category':
                 $uri = route('reports.report.category', [$accounts, $categories, $start, $end]);
                 break;
@@ -301,9 +316,48 @@ class ReportController extends Controller
             case 'budget':
                 $uri = route('reports.report.budget', [$accounts, $budgets, $start, $end]);
                 break;
+            case 'tag':
+                $uri = route('reports.report.tag', [$accounts, $tags, $start, $end]);
+                break;
         }
 
         return redirect($uri);
+    }
+
+    /**
+     * @param Collection $accounts
+     * @param Collection $tags
+     * @param Carbon     $start
+     * @param Carbon     $end
+     *
+     * @return string
+     */
+    public function tagReport(Collection $accounts, Collection $tags, Carbon $start, Carbon $end)
+    {
+        if ($end < $start) {
+            return view('error')->with('message', trans('firefly.end_after_start_date')); // @codeCoverageIgnore
+        }
+        if ($start < session('first')) {
+            $start = session('first');
+        }
+
+        View::share(
+            'subTitle', trans(
+                          'firefly.report_tag',
+                          [
+                              'start' => $start->formatLocalized($this->monthFormat),
+                              'end'   => $end->formatLocalized($this->monthFormat),
+                          ]
+                      )
+        );
+
+        $generator = ReportGeneratorFactory::reportGenerator('Tag', $start, $end);
+        $generator->setAccounts($accounts);
+        $generator->setTags($tags);
+        $result = $generator->generate();
+
+        return $result;
+
     }
 
     /**
@@ -340,5 +394,23 @@ class ReportController extends Controller
     private function noReportOptions(): string
     {
         return view('reports.options.no-options')->render();
+    }
+
+    /**
+     * @return string
+     */
+    private function tagReportOptions(): string
+    {
+        /** @var TagRepositoryInterface $repository */
+        $repository = app(TagRepositoryInterface::class);
+        $tags       = $repository->get()->sortBy(
+            function (Tag $tag) {
+                return $tag->tag;
+            }
+        );
+        $result     = view('reports.options.tag', compact('tags'))->render();
+
+        return $result;
+
     }
 }

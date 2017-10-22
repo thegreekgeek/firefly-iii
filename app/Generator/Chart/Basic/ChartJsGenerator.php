@@ -1,19 +1,30 @@
 <?php
 /**
  * ChartJsGenerator.php
- * Copyright (C) 2016 thegrumpydictator@gmail.com
+ * Copyright (c) 2017 thegrumpydictator@gmail.com
  *
- * This software may be modified and distributed under the terms of the
- * Creative Commons Attribution-ShareAlike 4.0 International License.
+ * This file is part of Firefly III.
  *
- * See the LICENSE file for details.
+ * Firefly III is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Firefly III is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Firefly III.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace FireflyIII\Generator\Chart\Basic;
 
 use FireflyIII\Support\ChartColour;
+use Steam;
 
 /**
  * Class ChartJsGenerator
@@ -80,6 +91,9 @@ class ChartJsGenerator implements GeneratorInterface
             if (isset($set['fill'])) {
                 $currentSet['fill'] = $set['fill'];
             }
+            if (isset($set['currency_symbol'])) {
+                $currentSet['currency_symbol'] = $set['currency_symbol'];
+            }
 
             $chartData['datasets'][] = $currentSet;
         }
@@ -104,15 +118,22 @@ class ChartJsGenerator implements GeneratorInterface
             ],
             'labels'   => [],
         ];
-        $index     = 0;
+
+        // sort by value, keep keys.
+        // different sort when values are positive and when they're negative.
+        asort($data);
+        $next = next($data);
+        if (!is_bool($next) && bccomp($next, '0') === 1) {
+            // next is positive, sort other way around.
+            arsort($data);
+        }
+        unset($next);
+
+        $index = 0;
         foreach ($data as $key => $value) {
 
             // make larger than 0
-            if (bccomp($value, '0') === -1) {
-                $value = bcmul($value, '-1');
-            }
-
-            $chartData['datasets'][0]['data'][]            = $value;
+            $chartData['datasets'][0]['data'][]            = floatval(Steam::positive($value));
             $chartData['datasets'][0]['backgroundColor'][] = ChartColour::getColour($index);
             $chartData['labels'][]                         = $key;
             $index++;
